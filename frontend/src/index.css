@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+    --color-cloud: #CCD6EB;
+    --color-blue: #B7D0E1;
+    --color-coral: #F0817F;
+    --color-indigo: #565B9F;
+
+    --font-sans: "Inter", sans-serif;
+    --font-serif: "Playfair Display", serif;
+}
+
+@layer base {
+    body {
+        @apply font-sans;
+        background-color: #FFFFFF;
+    }
+}
+
+@layer components {
+    .nav-item {
+        @apply text-lg text-indigo p-2 font-bold;
+    }
+
+    #new-entry-btn {
+        @apply h-10 w-28 mr-2 rounded-full bg-indigo text-base font-bold text-white shadow-sm border-none cursor-pointer;
+    }
+}
