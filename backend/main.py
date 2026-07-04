@@ -1,15 +1,28 @@
+from fastapi.concurrency import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from database import init_db
+from database import init_db, engine
 import models
 
-
-app = FastAPI()
 
 origins = [
     "http://localhost:5173"
 ]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    print("Database sync complete")
+
+    yield
+
+    engine.dispose()
+    print("Shut down database sync")
+
+app = FastAPI(lifespan=lifespan)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,11 +31,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
-    print("Database sync complete")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
