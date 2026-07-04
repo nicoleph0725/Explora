@@ -1,10 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
 @import "tailwindcss";
 
 @theme {
-    --color-cloud: #CCD6EB;
-    --color-blue: #B7D0E1;
-    --color-coral: #F0817F;
-    --color-indigo: #565B9F;
+    --color-maroon: #722F37;
+    --color-maroon-dark: #4A1B21;
+    --color-maroon-light: #9C4D58;
+    
+    --color-beige-light: #FAF6F0;
+    --color-beige-medium: #F2EAE1;
+    --color-beige-dark: #E6D8C9;
+    --color-beige-deep: #D7C4B1;
+    
+    --color-gold: #C5A880;
+    --color-gold-dark: #A68B63;
 
     --font-sans: "Inter", sans-serif;
     --font-serif: "Playfair Display", serif;
@@ -12,17 +21,16 @@
 
 @layer base {
     body {
-        @apply font-sans;
-        background-color: #FFFFFF;
+        @apply font-sans bg-beige-light text-stone-800;
     }
 }
 
 @layer components {
     .nav-item {
-        @apply text-lg text-indigo p-2 font-bold;
+        @apply text-base text-maroon hover:text-maroon-light px-3 py-2 font-semibold transition-colors duration-200 cursor-pointer;
     }
 
     #new-entry-btn {
-        @apply h-10 w-28 mr-2 rounded-full bg-indigo text-base font-bold text-white shadow-sm border-none cursor-pointer;
+        @apply h-10 px-5 rounded-full bg-maroon hover:bg-maroon-dark text-sm font-bold text-beige-light shadow-md border-none cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200;
     }
 }
