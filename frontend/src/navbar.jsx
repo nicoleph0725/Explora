@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function Navbar() {
+export default function Navbar({ onLogout }) {
   return (
     <header className="sticky top-0 z-50 w-full bg-beige-light/80 backdrop-blur-md border-b border-beige-dark/50 shadow-sm">
       <nav className="max-w-6xl mx-auto flex items-center justify-between h-16 px-6">
@@ -12,9 +12,19 @@ export default function Navbar() {
           <button id="new-entry-btn" className="hidden sm:inline-flex items-center justify-center">
             + New Entry
           </button>
-          <ul className="flex items-center gap-1">
+          <ul className="flex items-center gap-2">
             <li className="nav-item rounded-md hover:bg-beige-medium/50">About</li>
             <li className="nav-item rounded-md hover:bg-beige-medium/50">Profile</li>
+            {onLogout && (
+              <li>
+                <button
+                  onClick={onLogout}
+                  className="text-xs font-semibold text-stone-500 hover:text-maroon px-3 py-1.5 rounded-lg border border-beige-dark/60 hover:bg-beige-medium/60 transition-all cursor-pointer"
+                >
+                  Sign Out
+                </button>
+              </li>
+            )}
           </ul>
         </div>
       </nav>

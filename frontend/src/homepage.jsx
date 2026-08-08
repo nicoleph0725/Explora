@@ -1,9 +1,9 @@
 import Navbar from './navbar'
 
-export default function Homepage() {
+export default function Homepage({ onLogout }) {
   return (
     <div className="min-h-screen bg-beige-light pb-20">
-      <Navbar />
+      <Navbar onLogout={onLogout} />
       <div className="max-w-4xl mx-auto px-6 pt-12">
         {/* Hero Section */}
         <div className="mb-10 text-center md:text-left">
