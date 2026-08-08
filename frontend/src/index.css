@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap');
 
 @import "tailwindcss";
 
@@ -15,13 +15,23 @@
     --color-gold: #C5A880;
     --color-gold-dark: #A68B63;
 
+    /* Added Scrapbook Color Palette Extensions */
+    --color-terracotta: #D96B43;
+    --color-terracotta-dark: #B54F2B;
+    --color-sage: #587B66;
+    --color-sage-light: #E8EFEA;
+    --color-parchment: #FDFBF7;
+    --color-stamp-blue: #2C4A5E;
+
     --font-sans: "Inter", sans-serif;
     --font-serif: "Playfair Display", serif;
+    --font-handwriting: "Caveat", cursive;
+    --font-mono: "Courier Prime", monospace;
 }
 
 @layer base {
     body {
-        @apply font-sans bg-beige-light text-stone-800;
+        @apply font-sans bg-beige-light text-stone-800 selection:bg-gold/30;
     }
 }
 
@@ -32,5 +42,23 @@
 
     #new-entry-btn {
         @apply h-10 px-5 rounded-full bg-maroon hover:bg-maroon-dark text-sm font-bold text-beige-light shadow-md border-none cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200;
+    }
+
+    /* Washi Tape / Tape Strip Effect */
+    .washi-tape {
+        background-color: rgba(245, 230, 210, 0.75);
+        background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(197, 168, 128, 0.15) 10px, rgba(197, 168, 128, 0.15) 20px);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        backdrop-filter: blur(1px);
+    }
+
+    /* Polaroid Card Effect */
+    .polaroid-card {
+        @apply bg-white p-3 pt-3 pb-6 shadow-md hover:shadow-xl transition-all duration-300 border border-stone-200/60 rounded-sm;
+    }
+
+    /* Stamp Badge Effect */
+    .passport-stamp {
+        @apply border-2 border-dashed border-stamp-blue text-stamp-blue font-mono uppercase rounded-full flex flex-col items-center justify-center p-2 tracking-widest text-center opacity-85 rotate-[-8deg] select-none;
     }
 }
