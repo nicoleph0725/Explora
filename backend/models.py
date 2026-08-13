@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from sqlmodel import SQLModel, Field, Column, JSON, Relationship
 
@@ -14,8 +14,9 @@ class User(SQLModel, table=True):
     email: str = Field(unique=True, index=True)
     username: Optional[str] = Field(default=None, unique=True, index=True)
     full_name: Optional[str] = Field(default=None)
+    hashed_password: str
     avatar_url: Optional[str] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now(timezone.utc))
 
     # Relationships
     journals: List["Journal"] = Relationship(back_populates="user")

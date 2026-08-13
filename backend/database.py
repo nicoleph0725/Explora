@@ -13,3 +13,14 @@ engine = create_engine(DATABASE_URL)
 
 def init_db():
     SQLModel.metadata.create_all(engine)
+
+def reset_db():
+    import models  # Load models into SQLModel metadata
+    SQLModel.metadata.drop_all(engine)
+    SQLModel.metadata.create_all(engine)
+    print("Database recreated successfully.")
+
+def get_session():
+    with Session(engine) as session:
+        yield session
+

@@ -1,9 +1,21 @@
+import os
+import sys
+from pathlib import Path
+
+# Ensure working directory is backend/ so uvicorn can find main:app from anywhere
+backend_dir = Path(__file__).resolve().parent
+os.chdir(backend_dir)
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 from fastapi.concurrency import asynccontextmanager
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import models  # Must import models first so SQLModel registers tables into metadata
 from database import init_db, engine
-import models
+from auth.sign_up import router as auth_router
 
 
 origins = [
@@ -22,6 +34,7 @@ async def lifespan(app: FastAPI):
     print("Shut down database sync")
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(auth_router)    
 
 
 app.add_middleware(
@@ -32,5 +45,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+#example endpoint:
+@app.get("/test/{item_id}/")
+async def test(item_id: str):
+    return {"hello": item_id}
+
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
