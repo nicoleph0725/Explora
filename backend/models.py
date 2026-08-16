@@ -16,7 +16,7 @@ class User(SQLModel, table=True):
     full_name: Optional[str] = Field(default=None)
     hashed_password: str
     avatar_url: Optional[str] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Relationships
     journals: List["Journal"] = Relationship(back_populates="user")

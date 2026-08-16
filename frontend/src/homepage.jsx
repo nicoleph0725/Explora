@@ -1,8 +1,34 @@
+import { useState, useEffect } from 'react'
 import Navbar from './navbar'
 import shanghaiCover from './assets/shanghai_cover.jpeg'
 import TokyoCover from './assets/tokyo_cover.jpeg'
+import { getCurrentUser } from './api'
 
-export default function Homepage({ onLogout }) {
+export default function Homepage(props) {
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const token = localStorage.getItem('token')
+      if (!token) return
+
+      try {
+        const userData = await getCurrentUser()
+        setUser(userData)
+        if (userData?.full_name) {
+          localStorage.setItem('user_full_name', userData.full_name)
+        }
+      } catch (err) {
+        console.error('Failed to fetch user profile:', err)
+      }
+    }
+
+    fetchUser()
+  }, [])
+
+  const storedName = localStorage.getItem('user_full_name')
+  const fullName = user?.full_name || storedName || (user?.email ? user.email : null)
+
   return (
     <div className="min-h-screen bg-beige-light pb-20 font-sans relative overflow-hidden">
       
@@ -10,16 +36,32 @@ export default function Homepage({ onLogout }) {
       <div className="absolute top-20 right-10 w-72 h-72 rounded-full bg-terracotta/5 blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-20 left-10 w-80 h-80 rounded-full bg-sage/10 blur-3xl pointer-events-none"></div>
 
-      <Navbar onLogout={onLogout} />
+      <Navbar onLogout={props.onLogout} user={user} />
       
       <main className="max-w-5xl mx-auto px-6 pt-10">
         
         {/* Header Banner */}
         <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-dashed border-beige-dark">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-parchment border border-beige-dark text-xs font-mono text-terracotta mb-3 shadow-2xs">
-              <span>📍 Explorer Dashboard</span>
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-parchment border border-beige-dark text-xs font-mono text-terracotta shadow-2xs">
+                <span>📍 Explorer Dashboard</span>
+              </div>
+
+              {fullName && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sage-light border border-sage/40 text-xs font-mono text-sage-dark shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-sage animate-pulse"></span>
+                  <span>Logged in as: <strong className="font-sans font-bold text-maroon-dark">{fullName}</strong></span>
+                </div>
+              )}
             </div>
+
+            {fullName && (
+              <p className="font-handwriting text-2xl sm:text-3xl text-terracotta font-bold mb-1">
+                Welcome back, {fullName}! 👋
+              </p>
+            )}
+
             <h1 className="font-serif text-4xl sm:text-5xl font-bold text-maroon-dark tracking-tight">
               My Travel Scrapbooks
             </h1>

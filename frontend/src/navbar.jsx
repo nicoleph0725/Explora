@@ -1,6 +1,6 @@
-import { useState } from 'react'
+export default function Navbar(props) {
+  const nameToDisplay = props.user?.full_name || localStorage.getItem('user_full_name')
 
-export default function Navbar({ onLogout }) {
   return (
     <header className="sticky top-0 z-50 w-full bg-beige-light/80 backdrop-blur-md border-b border-beige-dark/50 shadow-sm">
       <nav className="max-w-6xl mx-auto flex items-center justify-between h-16 px-6">
@@ -15,10 +15,15 @@ export default function Navbar({ onLogout }) {
           <ul className="flex items-center gap-2">
             <li className="nav-item rounded-md hover:bg-beige-medium/50">About</li>
             <li className="nav-item rounded-md hover:bg-beige-medium/50">Profile</li>
-            {onLogout && (
+            {nameToDisplay && (
+              <li className="hidden sm:inline-flex items-center px-3 py-1 rounded-full bg-parchment border border-beige-dark text-xs font-mono text-maroon-dark font-semibold shadow-2xs">
+                👤 {nameToDisplay}
+              </li>
+            )}
+            {props.onLogout && (
               <li>
                 <button
-                  onClick={onLogout}
+                  onClick={props.onLogout}
                   className="text-xs font-semibold text-stone-500 hover:text-maroon px-3 py-1.5 rounded-lg border border-beige-dark/60 hover:bg-beige-medium/60 transition-all cursor-pointer"
                 >
                   Sign Out

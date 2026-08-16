@@ -1,15 +1,50 @@
 import { useState } from 'react'
 import scrapbookCover from './assets/scrapbook_cover.jpg'
+import { loginUser, signUpUser } from './api'
 
-export default function LoginPage({ onLogin }) {
+export default function LoginPage(props) {
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    onLogin()
+    setError('')
+    setLoading(true)
+
+    try {
+      let data
+      if (isSignUp) {
+        data = await signUpUser(name, email, password)
+        if (name) {
+          localStorage.setItem('user_full_name', name)
+        }
+      } else {
+        data = await loginUser(email, password)
+      }
+
+      if (data?.access_token) {
+        localStorage.setItem('token', data.access_token)
+        if (props.onLogin) {
+          props.onLogin()
+        }
+      }
+    } catch (err) {
+      console.error('Authentication error:', err)
+      const detail = err.response?.data?.detail
+      if (typeof detail === 'string') {
+        setError(detail)
+      } else if (Array.isArray(detail)) {
+        setError(detail.map((d) => d.msg).join(', '))
+      } else {
+        setError('Authentication failed. Make sure your backend server is running.')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -20,27 +55,29 @@ export default function LoginPage({ onLogin }) {
       <div className="absolute bottom-10 -right-20 w-96 h-96 rounded-full bg-sage/15 blur-3xl pointer-events-none"></div>
       
       {/* Top Header / Brand Bar */}
-      <header className="w-full max-w-6xl mx-auto px-6 py-6 flex items-center justify-between z-20">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <span className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-maroon">Explora</span>
-            {/* Hand-drawn style underline accent */}
-            <svg className="absolute -bottom-2 left-0 w-full h-2 text-terracotta" viewBox="0 0 100 10" preserveAspectRatio="none">
-              <path d="M0 5 Q 25 0, 50 5 T 100 5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-            </svg>
+      <header className="sticky top-0 z-50 w-full bg-beige-light/80 backdrop-blur-md border-b border-beige-dark/50 shadow-sm">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between relative">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <span className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-maroon">Explora</span>
+              {/* Hand-drawn style underline accent */}
+              <svg className="absolute -bottom-2 left-0 w-full h-2 text-terracotta" viewBox="0 0 100 10" preserveAspectRatio="none">
+                <path d="M0 5 Q 25 0, 50 5 T 100 5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <span className="font-mono text-[10px] tracking-widest text-stamp-blue border border-stamp-blue/40 px-2 py-0.5 rounded rotate-[-4deg] bg-parchment shadow-xs translate-y-3 z-10">
+              JOURNAL NO. 01
+            </span>
           </div>
-          <span className="font-mono text-[10px] tracking-widest text-stamp-blue border border-stamp-blue/40 px-2 py-0.5 rounded rotate-[-4deg] bg-parchment shadow-xs">
-            JOURNAL NO. 01
-          </span>
-        </div>
 
-        <button
-          onClick={onLogin}
-          className="text-xs sm:text-sm font-bold text-maroon hover:text-maroon-dark bg-parchment hover:bg-beige-medium px-4 py-2 rounded-full border border-beige-dark/80 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex items-center gap-1.5"
-        >
-          <span>Explore Demo</span>
-          <span className="font-mono text-terracotta">→</span>
-        </button>
+          <button
+            onClick={props.onLogin}
+            className="text-xs sm:text-sm font-bold text-maroon hover:text-maroon-dark bg-parchment hover:bg-beige-medium px-4 py-2 rounded-full border border-beige-dark/80 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex items-center gap-1.5"
+          >
+            <span>Explore Demo</span>
+            <span className="font-mono text-terracotta">→</span>
+          </button>
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -48,12 +85,6 @@ export default function LoginPage({ onLogin }) {
         
         {/* Left Side: Scrapbook Collage & Brand Story */}
         <div className="lg:w-1/2 text-center lg:text-left relative">
-          
-          {/* Passport Stamp Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sage-light border border-sage/40 text-sage-dark text-xs font-semibold mb-6 shadow-xs rotate-[-1deg]">
-            <span className="w-2 h-2 rounded-full bg-sage animate-ping"></span>
-            <span className="font-mono text-[11px] tracking-wider text-sage font-bold uppercase">Expedition Logbook</span>
-          </div>
 
           <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-maroon-dark tracking-tight leading-tight mb-4">
             Document your travels in your own <br className="hidden sm:inline" />
@@ -143,17 +174,24 @@ export default function LoginPage({ onLogin }) {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4 font-sans">
+              {error && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2 shadow-xs">
+                  <span>⚠️</span>
+                  <span>{error}</span>
+                </div>
+              )}
+
               {isSignUp && (
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1 font-mono">
-                    Explorer Name
+                    Full Name
                   </label>
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Amelia Earhart"
+                    placeholder="Nicole Pham"
                     className="w-full px-4 py-3 rounded-xl border border-beige-dark bg-white focus:border-terracotta focus:ring-2 focus:ring-terracotta/20 outline-none transition-all duration-200 text-sm"
                   />
                 </div>
@@ -190,9 +228,12 @@ export default function LoginPage({ onLogin }) {
               {/* Login Button */}
               <button
                 type="submit"
-                className="w-full mt-2 py-3.5 px-6 rounded-xl bg-maroon hover:bg-maroon-dark text-white font-bold text-sm shadow-md hover:shadow-lg transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border border-maroon-dark"
+                disabled={loading}
+                className="w-full mt-2 py-3.5 px-6 rounded-xl bg-maroon hover:bg-maroon-dark text-white font-bold text-sm shadow-md hover:shadow-lg transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border border-maroon-dark disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <span className="font-serif tracking-wide">{isSignUp ? 'Begin Journey' : 'Open Logbook'}</span>
+                <span className="font-serif tracking-wide">
+                  {loading ? 'Processing...' : isSignUp ? 'Begin Journey' : 'Open Logbook'}
+                </span>
                 <span className="font-mono text-gold font-bold">→</span>
               </button>
             </form>
@@ -201,7 +242,7 @@ export default function LoginPage({ onLogin }) {
             <div className="mt-6 pt-5 border-t border-dashed border-beige-dark text-center">
               <p className="text-xs text-stone-500 mb-2 font-handwriting text-base">Want to peek inside right now?</p>
               <button
-                onClick={onLogin}
+                onClick={props.onLogin}
                 className="w-full py-2.5 px-4 rounded-xl bg-sage-light hover:bg-sage/20 text-sage-dark font-mono text-xs font-bold border border-sage/40 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
               >
                 <span>🌿 Quick Guest Preview</span>
