@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import os
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional  
 from sqlmodel import Session, SQLModel, select
@@ -39,6 +40,14 @@ class UserCreate(SQLModel):
     full_name: str
     email: str
     password: str
+
+class UserRead(SQLModel):
+    id: uuid.UUID
+    email: str
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    created_at: datetime
 
 # Password hashing context using Bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -144,8 +153,8 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
 
-# Returns profile details of the currently authenticated use
-@router.get("/users/me/", response_model=User)
+# Returns profile details of the currently authenticated user
+@router.get("/users/me/", response_model=UserRead)
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 

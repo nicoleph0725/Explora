@@ -9,7 +9,11 @@ export default function Navbar(props) {
           <span className="w-2 h-2 rounded-full bg-gold animate-pulse"></span>
         </div>
         <div className="flex items-center gap-4">
-          <button id="new-entry-btn" className="hidden sm:inline-flex items-center justify-center">
+          <button
+            id="new-entry-btn"
+            onClick={props.onNewEntry}
+            className="hidden sm:inline-flex items-center justify-center cursor-pointer"
+          >
             + New Entry
           </button>
           <ul className="flex items-center gap-2">
