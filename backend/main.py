@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import models  # Must import models first so SQLModel registers tables into metadata
 from database import init_db, engine
 from auth.sign_up import router as auth_router
+from journals import router as journals_router
 
 
 origins = [
@@ -41,7 +42,8 @@ async def lifespan(app: FastAPI):
     print("Shut down database sync")
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(auth_router)    
+app.include_router(auth_router)
+app.include_router(journals_router)    
 
 
 app.add_middleware(

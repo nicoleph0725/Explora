@@ -60,13 +60,23 @@ export default function TopEditingToolbar({
 
         {/* Right: Save Status & Actions */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-beige-medium text-[11px] font-mono text-stone-600">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-beige-medium text-[11px] font-mono text-stone-600 shadow-2xs">
             <span
               className={`w-2 h-2 rounded-full ${
-                saveStatus === 'saving' ? 'bg-amber-500 animate-ping' : 'bg-emerald-600'
+                saveStatus === 'saving'
+                  ? 'bg-amber-500 animate-ping'
+                  : saveStatus === 'error'
+                  ? 'bg-red-500'
+                  : 'bg-emerald-600'
               }`}
             ></span>
-            <span>{saveStatus === 'saving' ? 'Saving...' : 'Auto-Saved'}</span>
+            <span>
+              {saveStatus === 'saving'
+                ? 'Saving to DB...'
+                : saveStatus === 'error'
+                ? 'Offline (Cached)'
+                : 'Saved to DB'}
+            </span>
           </div>
 
           <button

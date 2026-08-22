@@ -52,4 +52,61 @@ export async function getCurrentUser() {
   return response.data
 }
 
+/**
+ * Fetch all scrapbook journals for logged-in user
+ * GET /journals/
+ */
+export async function getJournals() {
+  const response = await api.get('/journals/')
+  return response.data
+}
+
+/**
+ * Fetch single journal with all pages
+ * GET /journals/{journalId}
+ */
+export async function getJournal(journalId) {
+  const response = await api.get(`/journals/${journalId}`)
+  return response.data
+}
+
+/**
+ * Create a new scrapbook journal
+ * POST /journals/
+ */
+export async function createJournal(journalData) {
+  const response = await api.post('/journals/', journalData)
+  return response.data
+}
+
+/**
+ * Update journal metadata (title, destination, description, cover)
+ * PUT /journals/{journalId}
+ */
+export async function updateJournal(journalId, updateData) {
+  const response = await api.put(`/journals/${journalId}`, updateData)
+  return response.data
+}
+
+/**
+ * Autosave & sync all pages + canvas elements to the database
+ * PUT /journals/{journalId}/pages
+ */
+export async function saveJournalPages(journalId, { title, pages }) {
+  const response = await api.put(`/journals/${journalId}/pages`, {
+    title,
+    pages,
+  })
+  return response.data
+}
+
+/**
+ * Delete a journal
+ * DELETE /journals/{journalId}
+ */
+export async function deleteJournal(journalId) {
+  const response = await api.delete(`/journals/${journalId}`)
+  return response.data
+}
+
 export default api

@@ -1,14 +1,30 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import TopEditingToolbar from './components/TopEditingToolbar'
 import AssetSidebar from './components/AssetSidebar'
 import ScrapbookCanvas from './components/ScrapbookCanvas'
 import BottomFilmstrip from './components/BottomFilmstrip'
+import { saveJournalPages, createJournal } from '../api'
 
 export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
+  // Current Journal ID in database (or temporary ID)
+  const [journalId, setJournalId] = useState(scrapbook?.id || null)
+
   // Scrapbook pages state
   const [pages, setPages] = useState(() => {
     if (scrapbook?.pages && scrapbook.pages.length > 0) {
       return JSON.parse(JSON.stringify(scrapbook.pages))
+    }
+    // Check localStorage cache first
+    const cached = localStorage.getItem(`explora_scrapbook_${scrapbook?.id}`)
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached)
+        if (parsed.pages && parsed.pages.length > 0) {
+          return parsed.pages
+        }
+      } catch (e) {
+        console.warn('Failed to parse cached journal:', e)
+      }
     }
     // Default fallback single page
     return [
@@ -25,7 +41,7 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
             x: 200,
             y: 80,
             width: 360,
-            text: 'My Travel Journal',
+            text: scrapbook?.title || 'My Travel Journal',
             fontFamily: 'Playfair Display',
             fontSize: 32,
             fontWeight: 'bold',
@@ -57,7 +73,7 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
   const [selectedElementId, setSelectedElementId] = useState(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [activeSidebarTab, setActiveSidebarTab] = useState('photos') // 'photos' | 'stickers' | 'tapes' | 'ephemera'
-  const [saveStatus, setSaveStatus] = useState('saved') // 'saved' | 'saving'
+  const [saveStatus, setSaveStatus] = useState('saved') // 'saved' | 'saving' | 'error'
   const [scrapbookTitle, setScrapbookTitle] = useState(scrapbook?.title || 'My Scrapbook')
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(100)
@@ -67,18 +83,111 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
   const [dragging, setDragging] = useState(null) // { id, startX, startY, origX, origY }
   const bottomScrollRef = useRef(null)
   const fileInputRef = useRef(null)
+  const isInitialMount = useRef(true)
 
   const activePage = pages[activePageIndex] || pages[0]
   const selectedElement = activePage?.elements.find((el) => el.id === selectedElementId)
 
-  // Trigger brief "saved" animation when pages change
+  // ================= REAL DEBOUNCED DATABASE AUTOSAVE =================
   useEffect(() => {
+    // Skip autosaving on initial render load
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+
     setSaveStatus('saving')
-    const timer = setTimeout(() => {
-      setSaveStatus('saved')
-    }, 400)
-    return () => clearTimeout(timer)
-  }, [pages, scrapbookTitle])
+
+    // Always backup to localStorage immediately (both single cache and user journals list)
+    try {
+      localStorage.setItem(
+        `explora_scrapbook_${journalId || 'temp'}`,
+        JSON.stringify({ title: scrapbookTitle, pages })
+      )
+
+      const existingJournals = JSON.parse(localStorage.getItem('explora_user_journals') || '[]')
+      const targetId = journalId || scrapbook?.id || 'temp'
+      const updatedJournalEntry = {
+        id: targetId,
+        title: scrapbookTitle,
+        destination: scrapbook?.destination || scrapbook?.country || 'My Destination',
+        country: scrapbook?.country || 'My Destination',
+        date: scrapbook?.date || 'Aug 2026',
+        coverImage: scrapbook?.coverImage || scrapbook?.cover_image_url || null,
+        description: scrapbook?.description || 'Travel scrapbook memories',
+        page_count: pages.length,
+        pages,
+        isCustom: true,
+        updated_at: new Date().toISOString(),
+      }
+      const newJournalsList = [
+        updatedJournalEntry,
+        ...existingJournals.filter((j) => j.id !== targetId && j.id !== scrapbook?.id),
+      ]
+      localStorage.setItem('explora_user_journals', JSON.stringify(newJournalsList))
+    } catch (err) {
+      console.warn('LocalStorage backup error:', err)
+    }
+
+    // Debounce backend DB sync by 700ms
+    const debounceTimer = setTimeout(async () => {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        // Not logged in or offline: stored locally
+        setSaveStatus('saved')
+        return
+      }
+
+      try {
+        // Validate if journalId is a valid UUID
+        const isUUID =
+          journalId &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+            journalId
+          )
+
+        if (isUUID) {
+          // Update existing journal in database
+          await saveJournalPages(journalId, {
+            title: scrapbookTitle,
+            pages,
+          })
+          setSaveStatus('saved')
+        } else {
+          // Create new journal in database and receive new UUID
+          const created = await createJournal({
+            title: scrapbookTitle,
+            destination: scrapbook?.destination || scrapbook?.country || 'My Destination',
+            description: scrapbook?.description || 'Travel scrapbook journal',
+            cover_image_url: scrapbook?.coverImage || scrapbook?.cover_image_url || null,
+            pages,
+          })
+          if (created?.id) {
+            const oldId = journalId || scrapbook?.id
+            setJournalId(created.id)
+
+            // Update ID in local storage list
+            try {
+              const localList = JSON.parse(localStorage.getItem('explora_user_journals') || '[]')
+              const updatedList = localList.map((j) =>
+                j.id === oldId ? { ...j, id: created.id, isDatabase: true } : j
+              )
+              localStorage.setItem('explora_user_journals', JSON.stringify(updatedList))
+            } catch (e) {
+              console.warn(e)
+            }
+          }
+          setSaveStatus('saved')
+        }
+      } catch (err) {
+        console.error('Database autosave error:', err)
+        // If DB fails (e.g. backend offline), data is safely in localStorage
+        setSaveStatus('error')
+      }
+    }, 700)
+
+    return () => clearTimeout(debounceTimer)
+  }, [pages, scrapbookTitle, journalId, scrapbook])
 
   // Mouse Move & Up handlers for dragging canvas elements
   useEffect(() => {
