@@ -15,6 +15,10 @@ export default function TopEditingToolbar({
   addElementToPage,
   zoomLevel,
   setZoomLevel,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }) {
   return (
     <header className="bg-beige-light border-b border-beige-dark shadow-xs z-30 shrink-0">
@@ -55,6 +59,38 @@ export default function TopEditingToolbar({
                 <span className="text-[10px] text-stone-400 group-hover:text-stone-700">✎</span>
               </button>
             )}
+          </div>
+
+          <div className="h-4 w-px bg-beige-dark hidden sm:block"></div>
+
+          {/* Undo & Redo Quick Buttons */}
+          <div className="flex items-center gap-1 bg-beige-medium/60 p-0.5 rounded-lg border border-beige-dark shadow-2xs">
+            <button
+              onClick={onUndo}
+              disabled={!canUndo}
+              className={`h-7 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-all ${
+                canUndo
+                  ? 'hover:bg-parchment hover:text-maroon text-stone-700 cursor-pointer shadow-2xs active:scale-95'
+                  : 'opacity-40 text-stone-400 cursor-not-allowed'
+              }`}
+              title="Undo (Ctrl+Z)"
+            >
+              <span className="text-sm font-bold">↶</span>
+              <span className="hidden sm:inline">Undo</span>
+            </button>
+            <button
+              onClick={onRedo}
+              disabled={!canRedo}
+              className={`h-7 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-all ${
+                canRedo
+                  ? 'hover:bg-parchment hover:text-maroon text-stone-700 cursor-pointer shadow-2xs active:scale-95'
+                  : 'opacity-40 text-stone-400 cursor-not-allowed'
+              }`}
+              title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
+            >
+              <span className="text-sm font-bold">↷</span>
+              <span className="hidden sm:inline">Redo</span>
+            </button>
           </div>
         </div>
 
@@ -298,6 +334,41 @@ export default function TopEditingToolbar({
 
           {selectedElement && (
             <>
+              {/* Rotation Quick Controls */}
+              <div className="flex items-center bg-parchment rounded-md border border-beige-dark shadow-2xs h-8 px-1">
+                <span className="text-[10px] font-mono text-stone-500 uppercase px-1 hidden xl:inline">Rot</span>
+                <button
+                  onClick={() =>
+                    updateSelectedElement({
+                      rotation: (((((selectedElement.rotation || 0) - 15) % 360) + 540) % 360) - 180,
+                    })
+                  }
+                  className="w-6 h-6 flex items-center justify-center text-xs font-mono text-stone-600 hover:text-maroon hover:bg-beige-medium rounded cursor-pointer"
+                  title="Rotate -15°"
+                >
+                  ↺
+                </button>
+                <button
+                  onClick={() => updateSelectedElement({ rotation: 0 })}
+                  className="text-xs font-mono px-1 text-maroon hover:text-maroon-dark font-bold min-w-[28px] text-center cursor-pointer hover:bg-beige-medium rounded"
+                  title="Click to reset rotation to 0°"
+                >
+                  {Math.round(selectedElement.rotation || 0)}°
+                </button>
+                <button
+                  onClick={() =>
+                    updateSelectedElement({
+                      rotation: (((((selectedElement.rotation || 0) + 15) % 360) + 540) % 360) - 180,
+                    })
+                  }
+                  className="w-6 h-6 flex items-center justify-center text-xs font-mono text-stone-600 hover:text-maroon hover:bg-beige-medium rounded cursor-pointer"
+                  title="Rotate +15°"
+                >
+                  ↻
+                </button>
+              </div>
+
+              {/* Layer Controls */}
               <button
                 onClick={() => changeLayer('up')}
                 className="h-8 w-8 rounded-md bg-parchment hover:bg-beige-medium border border-beige-dark text-xs font-mono text-stone-700 flex items-center justify-center cursor-pointer shadow-2xs"

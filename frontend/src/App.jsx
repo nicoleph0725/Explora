@@ -15,6 +15,7 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user_full_name')
+    localStorage.removeItem('explora_user_journals')
     setIsLoggedIn(false)
     setCurrentView('home')
     setSelectedScrapbook(null)

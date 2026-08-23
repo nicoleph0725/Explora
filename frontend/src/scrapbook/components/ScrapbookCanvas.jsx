@@ -7,8 +7,11 @@ export default function ScrapbookCanvas({
   pages,
   selectedElementId,
   setSelectedElementId,
-  dragging,
-  setDragging,
+  transformState,
+  onStartMove,
+  onStartResize,
+  onStartRotate,
+  onDuplicateElement,
   canvasRef,
   updateSelectedElement,
   deleteSelectedElement,
@@ -65,27 +68,25 @@ export default function ScrapbookCanvas({
             {/* Page Elements */}
             {activePage?.elements.map((el) => {
               const isSelected = el.id === selectedElementId
-              const isDragging = dragging?.id === el.id
+              const isInteracting = transformState?.id === el.id
+              const interactionType = isInteracting ? transformState.type : null
 
               return (
                 <CanvasElement
                   key={el.id}
                   el={el}
                   isSelected={isSelected}
-                  isDragging={isDragging}
-                  onMouseDown={(e) => {
+                  isInteracting={isInteracting}
+                  interactionType={interactionType}
+                  onMouseDown={(e, targetEl, elRef) => {
                     e.stopPropagation()
-                    setSelectedElementId(el.id)
-                    setDragging({
-                      id: el.id,
-                      startX: e.clientX,
-                      startY: e.clientY,
-                      origX: el.x,
-                      origY: el.y,
-                    })
+                    onStartMove && onStartMove(e, targetEl, elRef)
                   }}
+                  onStartResize={onStartResize}
+                  onStartRotate={onStartRotate}
                   onUpdate={(updates) => updateSelectedElement(updates, el.id)}
                   onDelete={() => deleteSelectedElement(el.id)}
+                  onDuplicate={() => onDuplicateElement && onDuplicateElement(el.id)}
                 />
               )
             })}

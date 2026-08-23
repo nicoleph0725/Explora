@@ -11,11 +11,28 @@ export default function Homepage(props) {
   const [journals, setJournals] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load all journals (from Database + LocalStorage + Default Samples)
+  // Load all journals for the logged-in user (from Backend Database + User-Scoped Cache)
   const loadAllJournals = useCallback(async () => {
     setIsLoading(true)
 
-    // 1. Read locally cached user journals
+    const token = localStorage.getItem('token')
+    if (!token) {
+      setJournals([])
+      setIsLoading(false)
+      return
+    }
+
+    let dbJournals = []
+    try {
+      const remoteData = await getJournals()
+      if (Array.isArray(remoteData)) {
+        dbJournals = remoteData
+      }
+    } catch (err) {
+      console.warn('Could not fetch database journals:', err)
+    }
+
+    // Read user-scoped local fallback if offline
     let localJournals = []
     try {
       const savedLocal = localStorage.getItem('explora_user_journals')
@@ -26,48 +43,25 @@ export default function Homepage(props) {
       console.warn('Failed to parse local journals:', e)
     }
 
-    // 2. Fetch remote journals from Database API if logged in
-    let dbJournals = []
-    const token = localStorage.getItem('token')
-    if (token) {
-      try {
-        const remoteData = await getJournals()
-        if (Array.isArray(remoteData)) {
-          dbJournals = remoteData
-        }
-      } catch (err) {
-        console.warn('Could not fetch database journals:', err)
-      }
-    }
-
-    // 3. Merge DB journals, Local journals, and Default Templates
-    // Priority: DB journals > Local journals > Default samples
+    // Merge: DB journals take priority, overlaying any unique local drafts
     const mergedMap = new Map()
 
-    // Add default templates first
-    DEFAULT_SCRAPBOOKS.forEach((item) => {
-      mergedMap.set(item.id, { ...item, isSample: true })
-    })
-
-    // Overlay/add local custom journals
     localJournals.forEach((item) => {
       if (item && item.id) {
         mergedMap.set(item.id, { ...item, isCustom: true })
       }
     })
 
-    // Overlay/add DB journals
     dbJournals.forEach((item) => {
       if (item && item.id) {
         mergedMap.set(item.id, { ...item, isDatabase: true })
       }
     })
 
-    // Convert map to array with user/custom journals first, then samples
     const allList = Array.from(mergedMap.values()).sort((a, b) => {
-      if (a.isDatabase || a.isCustom) return -1
-      if (b.isDatabase || b.isCustom) return 1
-      return 0
+      const dateA = new Date(a.updated_at || a.created_at || 0)
+      const dateB = new Date(b.updated_at || b.created_at || 0)
+      return dateB - dateA
     })
 
     setJournals(allList)

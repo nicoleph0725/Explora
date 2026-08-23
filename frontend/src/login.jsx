@@ -3,7 +3,7 @@ import scrapbookCover from './assets/scrapbook_cover.jpg'
 import { loginUser, signUpUser } from './api'
 
 export default function LoginPage(props) {
-  const [isSignUp, setIsSignUp] = useState(false)
+  const [isSignUp, setIsSignUp] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -70,13 +70,21 @@ export default function LoginPage(props) {
             </span>
           </div>
 
-          <button
-            onClick={props.onLogin}
-            className="text-xs sm:text-sm font-bold text-maroon hover:text-maroon-dark bg-parchment hover:bg-beige-medium px-4 py-2 rounded-full border border-beige-dark/80 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex items-center gap-1.5"
-          >
-            <span>Explore Demo</span>
-            <span className="font-mono text-terracotta">→</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-stone-500 font-mono hidden sm:inline">
+              {isSignUp ? 'Already have an account?' : 'Need an account?'}
+            </span>
+            <button
+              onClick={() => {
+                setIsSignUp(!isSignUp)
+                setError('')
+              }}
+              className="text-xs sm:text-sm font-bold text-maroon hover:text-maroon-dark bg-parchment hover:bg-beige-medium px-4 py-2 rounded-full border border-beige-dark/80 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex items-center gap-1.5"
+            >
+              <span>{isSignUp ? 'Sign In' : 'Create Account'}</span>
+              <span className="font-mono text-terracotta">→</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -160,15 +168,15 @@ export default function LoginPage(props) {
             {/* Header */}
             <div className="text-center mb-6">
               <span className="font-mono text-[10px] tracking-widest uppercase text-terracotta font-bold">
-                {isSignUp ? 'New Expedition Member' : 'Expedition Access'}
+                {isSignUp ? 'New Explorer Registration' : 'Explorer Sign In'}
               </span>
               <h2 className="font-serif text-3xl font-bold text-maroon-dark mt-1">
-                {isSignUp ? 'Open Your Journal' : 'Welcome Back'}
+                {isSignUp ? 'Create Your Account' : 'Welcome Back'}
               </h2>
               <p className="text-xs text-stone-500 font-sans mt-1">
                 {isSignUp 
-                  ? 'Start crafting your personal travel scrapbook' 
-                  : 'Enter your details to view your saved memories'}
+                  ? 'Sign up to create and save your private travel scrapbooks' 
+                  : 'Enter your credentials to access your private scrapbooks'}
               </p>
             </div>
 
@@ -191,7 +199,7 @@ export default function LoginPage(props) {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Nicole Pham"
+                    placeholder="e.g. Nicole Pham"
                     className="w-full px-4 py-3 rounded-xl border border-beige-dark bg-white focus:border-terracotta focus:ring-2 focus:ring-terracotta/20 outline-none transition-all duration-200 text-sm"
                   />
                 </div>
@@ -225,39 +233,31 @@ export default function LoginPage(props) {
                 />
               </div>
 
-              {/* Login Button */}
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full mt-2 py-3.5 px-6 rounded-xl bg-maroon hover:bg-maroon-dark text-white font-bold text-sm shadow-md hover:shadow-lg transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border border-maroon-dark disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <span className="font-serif tracking-wide">
-                  {loading ? 'Processing...' : isSignUp ? 'Begin Journey' : 'Open Logbook'}
+                  {loading ? 'Processing...' : isSignUp ? 'Create Account & Open Dashboard' : 'Open My Scrapbooks'}
                 </span>
                 <span className="font-mono text-gold font-bold">→</span>
               </button>
             </form>
 
-            {/* Quick Demo Bypass */}
-            <div className="mt-6 pt-5 border-t border-dashed border-beige-dark text-center">
-              <p className="text-xs text-stone-500 mb-2 font-handwriting text-base">Want to peek inside right now?</p>
-              <button
-                onClick={props.onLogin}
-                className="w-full py-2.5 px-4 rounded-xl bg-sage-light hover:bg-sage/20 text-sage-dark font-mono text-xs font-bold border border-sage/40 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
-              >
-                <span>🌿 Quick Guest Preview</span>
-              </button>
-            </div>
-
             {/* Toggle Sign Up / Sign In */}
-            <div className="mt-5 text-center">
+            <div className="mt-6 pt-5 border-t border-dashed border-beige-dark text-center">
               <p className="text-xs text-stone-500">
                 {isSignUp ? 'Already registered?' : 'First time journaling?'}{' '}
                 <button
-                  onClick={() => setIsSignUp(!isSignUp)}
+                  onClick={() => {
+                    setIsSignUp(!isSignUp)
+                    setError('')
+                  }}
                   className="font-bold text-terracotta hover:text-terracotta-dark underline cursor-pointer ml-1"
                 >
-                  {isSignUp ? 'Sign In Here' : 'Create Journal Account'}
+                  {isSignUp ? 'Sign In to Existing Account' : 'Create a Free Account'}
                 </button>
               </p>
             </div>

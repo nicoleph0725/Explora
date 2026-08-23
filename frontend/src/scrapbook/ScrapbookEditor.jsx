@@ -78,17 +78,21 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(100)
 
-  // Dragging state
+  // Unified transform state: 'move' | 'resize' | 'rotate'
   const canvasRef = useRef(null)
-  const [dragging, setDragging] = useState(null) // { id, startX, startY, origX, origY }
+  const [transformState, setTransformState] = useState(null)
   const bottomScrollRef = useRef(null)
   const fileInputRef = useRef(null)
   const isInitialMount = useRef(true)
 
+  // Keep fresh reference of pages synchronized on every render
+  const pagesRef = useRef(pages)
+  pagesRef.current = pages
+
   const activePage = pages[activePageIndex] || pages[0]
   const selectedElement = activePage?.elements.find((el) => el.id === selectedElementId)
 
-  // ================= REAL DEBOUNCED DATABASE AUTOSAVE =================
+  // ================= REAL DEBOUNCED DATABASE & LOCALSTORAGE AUTOSAVE =================
   useEffect(() => {
     // Skip autosaving on initial render load
     if (isInitialMount.current) {
@@ -98,48 +102,45 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
 
     setSaveStatus('saving')
 
-    // Always backup to localStorage immediately (both single cache and user journals list)
-    try {
-      localStorage.setItem(
-        `explora_scrapbook_${journalId || 'temp'}`,
-        JSON.stringify({ title: scrapbookTitle, pages })
-      )
-
-      const existingJournals = JSON.parse(localStorage.getItem('explora_user_journals') || '[]')
-      const targetId = journalId || scrapbook?.id || 'temp'
-      const updatedJournalEntry = {
-        id: targetId,
-        title: scrapbookTitle,
-        destination: scrapbook?.destination || scrapbook?.country || 'My Destination',
-        country: scrapbook?.country || 'My Destination',
-        date: scrapbook?.date || 'Aug 2026',
-        coverImage: scrapbook?.coverImage || scrapbook?.cover_image_url || null,
-        description: scrapbook?.description || 'Travel scrapbook memories',
-        page_count: pages.length,
-        pages,
-        isCustom: true,
-        updated_at: new Date().toISOString(),
-      }
-      const newJournalsList = [
-        updatedJournalEntry,
-        ...existingJournals.filter((j) => j.id !== targetId && j.id !== scrapbook?.id),
-      ]
-      localStorage.setItem('explora_user_journals', JSON.stringify(newJournalsList))
-    } catch (err) {
-      console.warn('LocalStorage backup error:', err)
-    }
-
-    // Debounce backend DB sync by 700ms
+    // Debounce both localStorage backup and backend DB sync by 700ms
     const debounceTimer = setTimeout(async () => {
+      try {
+        localStorage.setItem(
+          `explora_scrapbook_${journalId || 'temp'}`,
+          JSON.stringify({ title: scrapbookTitle, pages })
+        )
+
+        const existingJournals = JSON.parse(localStorage.getItem('explora_user_journals') || '[]')
+        const targetId = journalId || scrapbook?.id || 'temp'
+        const updatedJournalEntry = {
+          id: targetId,
+          title: scrapbookTitle,
+          destination: scrapbook?.destination || scrapbook?.country || 'My Destination',
+          country: scrapbook?.country || 'My Destination',
+          date: scrapbook?.date || 'Aug 2026',
+          coverImage: scrapbook?.coverImage || scrapbook?.cover_image_url || null,
+          description: scrapbook?.description || 'Travel scrapbook memories',
+          page_count: pages.length,
+          pages,
+          isCustom: true,
+          updated_at: new Date().toISOString(),
+        }
+        const newJournalsList = [
+          updatedJournalEntry,
+          ...existingJournals.filter((j) => j.id !== targetId && j.id !== scrapbook?.id),
+        ]
+        localStorage.setItem('explora_user_journals', JSON.stringify(newJournalsList))
+      } catch (err) {
+        console.warn('LocalStorage backup error:', err)
+      }
+
       const token = localStorage.getItem('token')
       if (!token) {
-        // Not logged in or offline: stored locally
         setSaveStatus('saved')
         return
       }
 
       try {
-        // Validate if journalId is a valid UUID
         const isUUID =
           journalId &&
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -147,14 +148,12 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
           )
 
         if (isUUID) {
-          // Update existing journal in database
           await saveJournalPages(journalId, {
             title: scrapbookTitle,
             pages,
           })
           setSaveStatus('saved')
         } else {
-          // Create new journal in database and receive new UUID
           const created = await createJournal({
             title: scrapbookTitle,
             destination: scrapbook?.destination || scrapbook?.country || 'My Destination',
@@ -165,8 +164,6 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
           if (created?.id) {
             const oldId = journalId || scrapbook?.id
             setJournalId(created.id)
-
-            // Update ID in local storage list
             try {
               const localList = JSON.parse(localStorage.getItem('explora_user_journals') || '[]')
               const updatedList = localList.map((j) =>
@@ -180,60 +177,437 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
           setSaveStatus('saved')
         }
       } catch (err) {
-        console.error('Database autosave error:', err)
-        // If DB fails (e.g. backend offline), data is safely in localStorage
-        setSaveStatus('error')
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token')
+          setSaveStatus('saved')
+        } else {
+          console.warn('Backend sync note (operating in local cache):', err?.message || err)
+          setSaveStatus('error')
+        }
       }
     }, 700)
 
     return () => clearTimeout(debounceTimer)
   }, [pages, scrapbookTitle, journalId, scrapbook])
 
-  // Mouse Move & Up handlers for dragging canvas elements
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (!dragging || !canvasRef.current) return
+  // ================= SYNCHRONOUS REF-BASED UNDO / REDO HISTORY SYSTEM =================
+  const historyRef = useRef([JSON.parse(JSON.stringify(pages))])
+  const historyIndexRef = useRef(0)
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
+  const pagesBeforeTransformRef = useRef(null)
 
-      const deltaX = (e.clientX - dragging.startX) / (zoomLevel / 100)
-      const deltaY = (e.clientY - dragging.startY) / (zoomLevel / 100)
+  const updateUndoRedoState = useCallback(() => {
+    setCanUndo(historyIndexRef.current > 0)
+    setCanRedo(historyIndexRef.current < historyRef.current.length - 1)
+  }, [])
 
-      setPages((prevPages) =>
-        prevPages.map((pg, pIdx) => {
-          if (pIdx !== activePageIndex) return pg
-          return {
-            ...pg,
-            elements: pg.elements.map((el) => {
-              if (el.id === dragging.id) {
-                return {
-                  ...el,
-                  x: Math.round(dragging.origX + deltaX),
-                  y: Math.round(dragging.origY + deltaY),
-                }
-              }
-              return el
-            }),
-          }
-        })
+  const pushHistory = useCallback(
+    (newPages) => {
+      const currentHistory = historyRef.current
+      const currentIndex = historyIndexRef.current
+      const serializedNew = JSON.stringify(newPages)
+      const serializedCur = JSON.stringify(currentHistory[currentIndex])
+
+      // If identical, don't record duplicate step
+      if (serializedNew === serializedCur) return
+
+      // Truncate any redo steps ahead
+      const trimmed = currentHistory.slice(0, currentIndex + 1)
+      trimmed.push(JSON.parse(serializedNew))
+
+      // Keep at most 50 steps
+      if (trimmed.length > 50) {
+        trimmed.shift()
+      }
+
+      historyRef.current = trimmed
+      historyIndexRef.current = trimmed.length - 1
+      updateUndoRedoState()
+    },
+    [updateUndoRedoState]
+  )
+
+  const handleUndo = useCallback(() => {
+    if (historyIndexRef.current <= 0) return
+    historyIndexRef.current -= 1
+    const targetState = JSON.parse(JSON.stringify(historyRef.current[historyIndexRef.current]))
+    pagesRef.current = targetState
+    setPages(targetState)
+    setSelectedElementId(null)
+    updateUndoRedoState()
+  }, [updateUndoRedoState])
+
+  const handleRedo = useCallback(() => {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return
+    historyIndexRef.current += 1
+    const targetState = JSON.parse(JSON.stringify(historyRef.current[historyIndexRef.current]))
+    pagesRef.current = targetState
+    setPages(targetState)
+    setSelectedElementId(null)
+    updateUndoRedoState()
+  }, [updateUndoRedoState])
+
+  // ================= TRANSFORM START HANDLERS =================
+  const handleStartMove = useCallback(
+    (e, el) => {
+      if (e.target.isContentEditable && document.activeElement === e.target) return
+
+      pagesBeforeTransformRef.current = JSON.parse(JSON.stringify(pagesRef.current))
+
+      // Automatically bring clicked element to the top layer
+      const curPages = pagesRef.current
+      const curActivePage = curPages[activePageIndex] || curPages[0]
+      const maxZ = (curActivePage?.elements || []).reduce(
+        (acc, item) => Math.max(acc, item.zIndex || 1),
+        1
       )
+      const newZ = maxZ + 1
+
+      const updated = curPages.map((pg, pIdx) => {
+        if (pIdx !== activePageIndex) return pg
+        return {
+          ...pg,
+          elements: pg.elements.map((item) =>
+            item.id === el.id ? { ...item, zIndex: newZ } : item
+          ),
+        }
+      })
+      pagesRef.current = updated
+      setPages(updated)
+
+      setSelectedElementId(el.id)
+      setTransformState({
+        type: 'move',
+        id: el.id,
+        startX: e.clientX,
+        startY: e.clientY,
+        origX: el.x || 0,
+        origY: el.y || 0,
+      })
+    },
+    [activePageIndex]
+  )
+
+  const handleStartRotate = useCallback(
+    (e, el, elementRef) => {
+      e.stopPropagation()
+      if (!elementRef?.current) return
+
+      pagesBeforeTransformRef.current = JSON.parse(JSON.stringify(pagesRef.current))
+
+      // Bring to top layer
+      const curPages = pagesRef.current
+      const curActivePage = curPages[activePageIndex] || curPages[0]
+      const maxZ = (curActivePage?.elements || []).reduce(
+        (acc, item) => Math.max(acc, item.zIndex || 1),
+        1
+      )
+      const newZ = maxZ + 1
+
+      const updated = curPages.map((pg, pIdx) => {
+        if (pIdx !== activePageIndex) return pg
+        return {
+          ...pg,
+          elements: pg.elements.map((item) =>
+            item.id === el.id ? { ...item, zIndex: newZ } : item
+          ),
+        }
+      })
+      pagesRef.current = updated
+      setPages(updated)
+
+      const rect = elementRef.current.getBoundingClientRect()
+      const centerX = rect.left + rect.width / 2
+      const centerY = rect.top + rect.height / 2
+      const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI)
+
+      setSelectedElementId(el.id)
+      setTransformState({
+        type: 'rotate',
+        id: el.id,
+        centerX,
+        centerY,
+        startAngle,
+        origRotation: el.rotation || 0,
+      })
+    },
+    [activePageIndex]
+  )
+
+  const handleStartResize = useCallback(
+    (e, handle, el, elementRef) => {
+      e.stopPropagation()
+      if (!elementRef?.current) return
+
+      pagesBeforeTransformRef.current = JSON.parse(JSON.stringify(pagesRef.current))
+
+      // Bring to top layer
+      const curPages = pagesRef.current
+      const curActivePage = curPages[activePageIndex] || curPages[0]
+      const maxZ = (curActivePage?.elements || []).reduce(
+        (acc, item) => Math.max(acc, item.zIndex || 1),
+        1
+      )
+      const newZ = maxZ + 1
+
+      const updated = curPages.map((pg, pIdx) => {
+        if (pIdx !== activePageIndex) return pg
+        return {
+          ...pg,
+          elements: pg.elements.map((item) =>
+            item.id === el.id ? { ...item, zIndex: newZ } : item
+          ),
+        }
+      })
+      pagesRef.current = updated
+      setPages(updated)
+
+      const domEl = elementRef.current
+    const origW = el.width || domEl.offsetWidth || 100
+    const origH = el.height || domEl.offsetHeight || 100
+    const origRot = el.rotation || 0
+    const rad = (origRot * Math.PI) / 180
+    const cos = Math.cos(rad)
+    const sin = Math.sin(rad)
+
+    const origCx = (el.x || 0) + origW / 2
+    const origCy = (el.y || 0) + origH / 2
+
+    const hw = origW / 2
+    const hh = origH / 2
+
+    let anchorLx = 0
+    let anchorLy = 0
+    let handleLx = 0
+    let handleLy = 0
+
+    if (handle === 'se') {
+      anchorLx = -hw; anchorLy = -hh // Fixed Anchor: Top-Left
+      handleLx = hw;  handleLy = hh  // Drag Handle: Bottom-Right
+    } else if (handle === 'sw') {
+      anchorLx = hw;  anchorLy = -hh // Fixed Anchor: Top-Right
+      handleLx = -hw; handleLy = hh  // Drag Handle: Bottom-Left
+    } else if (handle === 'ne') {
+      anchorLx = -hw; anchorLy = hh  // Fixed Anchor: Bottom-Left
+      handleLx = hw;  handleLy = -hh // Drag Handle: Top-Right
+    } else if (handle === 'nw') {
+      anchorLx = hw;  anchorLy = hh  // Fixed Anchor: Bottom-Right
+      handleLx = -hw; handleLy = -hh // Drag Handle: Top-Left
+    }
+
+    // Exact canvas coordinate of the opposite anchor corner
+    const anchorAx = origCx + (anchorLx * cos - anchorLy * sin)
+    const anchorAy = origCy + (anchorLx * sin + anchorLy * cos)
+
+    // Diagonal direction vector v0 from Anchor to Handle in canvas space
+    const handlePosCanvasX = origCx + (handleLx * cos - handleLy * sin)
+    const handlePosCanvasY = origCy + (handleLx * sin + handleLy * cos)
+    const v0x = handlePosCanvasX - anchorAx
+    const v0y = handlePosCanvasY - anchorAy
+    const L0sq = Math.max(1, v0x * v0x + v0y * v0y)
+
+    setSelectedElementId(el.id)
+    setTransformState({
+      type: 'resize',
+      id: el.id,
+      handle,
+      origW,
+      origH,
+      cos,
+      sin,
+      anchorAx,
+      anchorAy,
+      v0x,
+      v0y,
+      L0sq,
+      anchorLx,
+      anchorLy,
+    })
+  }, [])
+
+  // ================= MOUSE MOVE & UP TRANSFORM HANDLERS =================
+  const animFrameRef = useRef(null)
+
+  useEffect(() => {
+    if (!transformState) return
+
+    const handleMouseMove = (e) => {
+      if (!transformState || !canvasRef.current) return
+
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current)
+      }
+
+      const clientX = e.clientX
+      const clientY = e.clientY
+      const shiftKey = e.shiftKey
+
+      animFrameRef.current = requestAnimationFrame(() => {
+        const scale = zoomLevel / 100
+
+        // 1. DRAG MOVE ELEMENT
+        if (transformState.type === 'move') {
+          const deltaX = (clientX - transformState.startX) / scale
+          const deltaY = (clientY - transformState.startY) / scale
+
+          const updated = pagesRef.current.map((pg, pIdx) => {
+            if (pIdx !== activePageIndex) return pg
+            return {
+              ...pg,
+              elements: pg.elements.map((el) => {
+                if (el.id === transformState.id) {
+                  return {
+                    ...el,
+                    x: Math.round(transformState.origX + deltaX),
+                    y: Math.round(transformState.origY + deltaY),
+                  }
+                }
+                return el
+              }),
+            }
+          })
+          pagesRef.current = updated
+          setPages(updated)
+        }
+
+        // 2. DRAG ROTATE ELEMENT
+        else if (transformState.type === 'rotate') {
+          const currentAngle =
+            Math.atan2(
+              clientY - transformState.centerY,
+              clientX - transformState.centerX
+            ) * (180 / Math.PI)
+
+          const angleDelta = currentAngle - transformState.startAngle
+          let newRotation = transformState.origRotation + angleDelta
+
+          if (shiftKey) {
+            newRotation = Math.round(newRotation / 15) * 15
+          } else {
+            newRotation = Math.round(newRotation)
+          }
+
+          // Normalize to [-180, 180]
+          newRotation = ((((newRotation + 180) % 360) + 360) % 360) - 180
+
+          const updated = pagesRef.current.map((pg, pIdx) => {
+            if (pIdx !== activePageIndex) return pg
+            return {
+              ...pg,
+              elements: pg.elements.map((el) => {
+                if (el.id === transformState.id) {
+                  return {
+                    ...el,
+                    rotation: newRotation,
+                  }
+                }
+                return el
+              }),
+            }
+          })
+          pagesRef.current = updated
+          setPages(updated)
+        }
+
+        // 3. DRAG CORNER RESIZE (ANCHOR-PINNED DIAGONAL PROJECTION)
+        else if (transformState.type === 'resize') {
+          if (!canvasRef.current) return
+          const canvasRect = canvasRef.current.getBoundingClientRect()
+          const mouseCanvasX = (clientX - canvasRect.left) / scale
+          const mouseCanvasY = (clientY - canvasRect.top) / scale
+
+          const {
+            origW,
+            origH,
+            cos,
+            sin,
+            anchorAx,
+            anchorAy,
+            v0x,
+            v0y,
+            L0sq,
+            anchorLx,
+            anchorLy,
+          } = transformState
+
+          // Vector from Anchor A to mouse
+          const dx = mouseCanvasX - anchorAx
+          const dy = mouseCanvasY - anchorAy
+
+          // Project (dx, dy) onto diagonal vector v0
+          const proj = (dx * v0x + dy * v0y) / L0sq
+          const scaleFactor = Math.max(0.2, proj)
+
+          const newW = Math.max(30, Math.round(origW * scaleFactor))
+          const newH = Math.max(20, Math.round(origH * scaleFactor))
+
+          // In the new state, anchor A is at offset (anchorLx * scaleFactor, anchorLy * scaleFactor) from new center C'
+          const curAnchorLx = anchorLx * scaleFactor
+          const curAnchorLy = anchorLy * scaleFactor
+
+          const newCx = anchorAx - (curAnchorLx * cos - curAnchorLy * sin)
+          const newCy = anchorAy - (curAnchorLx * sin + curAnchorLy * cos)
+
+          const newX = Math.round(newCx - newW / 2)
+          const newY = Math.round(newCy - newH / 2)
+
+          const updated = pagesRef.current.map((pg, pIdx) => {
+            if (pIdx !== activePageIndex) return pg
+            return {
+              ...pg,
+              elements: pg.elements.map((el) => {
+                if (el.id === transformState.id) {
+                  return {
+                    ...el,
+                    x: newX,
+                    y: newY,
+                    width: newW,
+                    height: newH,
+                  }
+                }
+                return el
+              }),
+            }
+          })
+          pagesRef.current = updated
+          setPages(updated)
+        }
+      })
     }
 
     const handleMouseUp = () => {
-      if (dragging) {
-        setDragging(null)
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current)
+      }
+      setTransformState(null)
+
+      // Reliably push final state to history if changed
+      if (pagesBeforeTransformRef.current) {
+        const before = JSON.stringify(pagesBeforeTransformRef.current)
+        const current = JSON.stringify(pagesRef.current)
+        if (before !== current) {
+          pushHistory(pagesRef.current)
+        }
+        pagesBeforeTransformRef.current = null
       }
     }
 
-    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mousemove', handleMouseMove, { passive: true })
     window.addEventListener('mouseup', handleMouseUp)
     return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current)
+      }
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [dragging, activePageIndex, zoomLevel])
+  }, [transformState, activePageIndex, zoomLevel, pushHistory])
 
   // ================= PAGE ACTIONS =================
   const handleAddNewPage = () => {
-    const newPageNum = pages.length + 1
+    const curPages = pagesRef.current
+    const newPageNum = curPages.length + 1
     const newPage = {
       id: 'page-' + Date.now(),
       pageNumber: newPageNum,
@@ -259,12 +633,13 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
       ],
     }
 
-    const updatedPages = [...pages, newPage]
+    const updatedPages = [...curPages, newPage]
+    pagesRef.current = updatedPages
     setPages(updatedPages)
+    pushHistory(updatedPages)
     setActivePageIndex(updatedPages.length - 1)
     setSelectedElementId(null)
 
-    // Scroll bottom bar to new page
     setTimeout(() => {
       if (bottomScrollRef.current) {
         bottomScrollRef.current.scrollLeft = bottomScrollRef.current.scrollWidth
@@ -274,16 +649,19 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
 
   const handleDeletePage = (pageIdx, e) => {
     e?.stopPropagation()
-    if (pages.length <= 1) {
+    const curPages = pagesRef.current
+    if (curPages.length <= 1) {
       alert('Your scrapbook must have at least one page!')
       return
     }
 
-    const updated = pages
+    const updated = curPages
       .filter((_, idx) => idx !== pageIdx)
       .map((p, idx) => ({ ...p, pageNumber: idx + 1 }))
 
+    pagesRef.current = updated
     setPages(updated)
+    pushHistory(updated)
     if (activePageIndex >= updated.length) {
       setActivePageIndex(updated.length - 1)
     } else if (activePageIndex === pageIdx) {
@@ -294,7 +672,8 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
 
   const handleDuplicatePage = (pageIdx, e) => {
     e?.stopPropagation()
-    const targetPage = pages[pageIdx]
+    const curPages = pagesRef.current
+    const targetPage = curPages[pageIdx]
     const duplicatedElements = targetPage.elements.map((el) => ({
       ...el,
       id: 'el-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
@@ -309,19 +688,23 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
     }
 
     const updated = [
-      ...pages.slice(0, pageIdx + 1),
+      ...curPages.slice(0, pageIdx + 1),
       duplicatedPage,
-      ...pages.slice(pageIdx + 1),
+      ...curPages.slice(pageIdx + 1),
     ].map((p, idx) => ({ ...p, pageNumber: idx + 1 }))
 
+    pagesRef.current = updated
     setPages(updated)
+    pushHistory(updated)
     setActivePageIndex(pageIdx + 1)
     setSelectedElementId(null)
   }
 
   // ================= ELEMENT ACTIONS =================
   const addElementToPage = (newElData) => {
-    const maxZ = activePage.elements.reduce((acc, el) => Math.max(acc, el.zIndex || 1), 1)
+    const curPages = pagesRef.current
+    const curActivePage = curPages[activePageIndex] || curPages[0]
+    const maxZ = (curActivePage?.elements || []).reduce((acc, el) => Math.max(acc, el.zIndex || 1), 1)
     const newEl = {
       id: 'el-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
       x: 180 + Math.floor(Math.random() * 80),
@@ -331,47 +714,52 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
       ...newElData,
     }
 
-    setPages((prev) =>
-      prev.map((pg, idx) => {
-        if (idx !== activePageIndex) return pg
-        return {
-          ...pg,
-          elements: [...pg.elements, newEl],
-        }
-      })
-    )
+    const updated = curPages.map((pg, idx) => {
+      if (idx !== activePageIndex) return pg
+      return {
+        ...pg,
+        elements: [...pg.elements, newEl],
+      }
+    })
+    pagesRef.current = updated
+    setPages(updated)
+    pushHistory(updated)
     setSelectedElementId(newEl.id)
   }
 
   const updateSelectedElement = (updates, targetId = selectedElementId) => {
     if (!targetId) return
-    setPages((prev) =>
-      prev.map((pg, idx) => {
-        if (idx !== activePageIndex) return pg
-        return {
-          ...pg,
-          elements: pg.elements.map((el) => {
-            if (el.id === targetId) {
-              return { ...el, ...updates }
-            }
-            return el
-          }),
-        }
-      })
-    )
+    const curPages = pagesRef.current
+    const updated = curPages.map((pg, idx) => {
+      if (idx !== activePageIndex) return pg
+      return {
+        ...pg,
+        elements: pg.elements.map((el) => {
+          if (el.id === targetId) {
+            return { ...el, ...updates }
+          }
+          return el
+        }),
+      }
+    })
+    pagesRef.current = updated
+    setPages(updated)
+    pushHistory(updated)
   }
 
   const deleteSelectedElement = (targetId = selectedElementId) => {
     if (!targetId) return
-    setPages((prev) =>
-      prev.map((pg, idx) => {
-        if (idx !== activePageIndex) return pg
-        return {
-          ...pg,
-          elements: pg.elements.filter((el) => el.id !== targetId),
-        }
-      })
-    )
+    const curPages = pagesRef.current
+    const updated = curPages.map((pg, idx) => {
+      if (idx !== activePageIndex) return pg
+      return {
+        ...pg,
+        elements: pg.elements.filter((el) => el.id !== targetId),
+      }
+    })
+    pagesRef.current = updated
+    setPages(updated)
+    pushHistory(updated)
     if (selectedElementId === targetId) {
       setSelectedElementId(null)
     }
@@ -379,19 +767,21 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
 
   const changeLayer = (direction) => {
     if (!selectedElementId) return
-    setPages((prev) =>
-      prev.map((pg, idx) => {
-        if (idx !== activePageIndex) return pg
-        const currentEl = pg.elements.find((e) => e.id === selectedElementId)
-        if (!currentEl) return pg
+    const curPages = pagesRef.current
+    const updated = curPages.map((pg, idx) => {
+      if (idx !== activePageIndex) return pg
+      const currentEl = pg.elements.find((e) => e.id === selectedElementId)
+      if (!currentEl) return pg
 
-        const newZ = direction === 'up' ? (currentEl.zIndex || 1) + 2 : Math.max(1, (currentEl.zIndex || 1) - 2)
-        return {
-          ...pg,
-          elements: pg.elements.map((el) => (el.id === selectedElementId ? { ...el, zIndex: newZ } : el)),
-        }
-      })
-    )
+      const newZ = direction === 'up' ? (currentEl.zIndex || 1) + 2 : Math.max(1, (currentEl.zIndex || 1) - 2)
+      return {
+        ...pg,
+        elements: pg.elements.map((el) => (el.id === selectedElementId ? { ...el, zIndex: newZ } : el)),
+      }
+    })
+    pagesRef.current = updated
+    setPages(updated)
+    pushHistory(updated)
   }
 
   // Handle Photo Upload
@@ -414,6 +804,103 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
     reader.readAsDataURL(file)
     e.target.value = ''
   }
+
+  const handleDuplicateElement = (targetId = selectedElementId) => {
+    if (!targetId) return
+    const curPages = pagesRef.current
+    const curActivePage = curPages[activePageIndex] || curPages[0]
+    const currentEl = curActivePage?.elements.find((el) => el.id === targetId)
+    if (!currentEl) return
+
+    const maxZ = (curActivePage?.elements || []).reduce((acc, el) => Math.max(acc, el.zIndex || 1), 1)
+    const newEl = {
+      ...currentEl,
+      id: 'el-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      x: (currentEl.x || 0) + 20,
+      y: (currentEl.y || 0) + 20,
+      zIndex: maxZ + 1,
+    }
+
+    const updated = curPages.map((pg, idx) => {
+      if (idx !== activePageIndex) return pg
+      return {
+        ...pg,
+        elements: [...pg.elements, newEl],
+      }
+    })
+    pagesRef.current = updated
+    setPages(updated)
+    pushHistory(updated)
+    setSelectedElementId(newEl.id)
+  }
+
+  // Keyboard Shortcuts (Ctrl+Z Undo, Ctrl+Y / Ctrl+Shift+Z Redo, Delete/Backspace, Arrows to nudge, Ctrl/Cmd+D to duplicate, Escape)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't intercept native text field editing shortcuts
+      const isInput =
+        document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA' ||
+        document.activeElement?.isContentEditable
+
+      if (isInput) return
+
+      // Global Undo / Redo Shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          handleRedo()
+        } else {
+          handleUndo()
+        }
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault()
+        handleRedo()
+        return
+      }
+
+      if (!selectedElementId) return
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault()
+        deleteSelectedElement(selectedElementId)
+      } else if (e.key === 'Escape') {
+        setSelectedElementId(null)
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        const step = e.shiftKey ? 10 : 1
+        updateSelectedElement({ x: (selectedElement?.x || 0) - step })
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        const step = e.shiftKey ? 10 : 1
+        updateSelectedElement({ x: (selectedElement?.x || 0) + step })
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        const step = e.shiftKey ? 10 : 1
+        updateSelectedElement({ y: (selectedElement?.y || 0) - step })
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        const step = e.shiftKey ? 10 : 1
+        updateSelectedElement({ y: (selectedElement?.y || 0) + step })
+      } else if (e.key === 'd' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        handleDuplicateElement(selectedElementId)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [
+    selectedElementId,
+    selectedElement,
+    deleteSelectedElement,
+    updateSelectedElement,
+    handleDuplicateElement,
+    handleUndo,
+    handleRedo,
+  ])
 
   // Background pattern CSS styles
   const getPatternBg = (pattern, color) => {
@@ -463,6 +950,10 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
         addElementToPage={addElementToPage}
         zoomLevel={zoomLevel}
         setZoomLevel={setZoomLevel}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
       />
 
       {/* MAIN WORKSPACE AREA */}
@@ -485,8 +976,11 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
           pages={pages}
           selectedElementId={selectedElementId}
           setSelectedElementId={setSelectedElementId}
-          dragging={dragging}
-          setDragging={setDragging}
+          transformState={transformState}
+          onStartMove={handleStartMove}
+          onStartResize={handleStartResize}
+          onStartRotate={handleStartRotate}
+          onDuplicateElement={handleDuplicateElement}
           canvasRef={canvasRef}
           updateSelectedElement={updateSelectedElement}
           deleteSelectedElement={deleteSelectedElement}

@@ -20,7 +20,7 @@ load_dotenv(dotenv_path=env_path)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key_change_in_prod")
 ALGORITHM = os.getenv("ALGORITHM", "HS256") 
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
