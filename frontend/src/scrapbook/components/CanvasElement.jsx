@@ -52,10 +52,19 @@ export default function CanvasElement({
     { id: 'sw', className: '-bottom-2 -left-2' },
   ]
 
+  const isTextElement = el.type === 'text'
+
   return (
     <div
       ref={elementRef}
-      onMouseDown={(e) => onMouseDown && onMouseDown(e, el, elementRef)}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => {
+        if (isTextElement) {
+          onMouseDown && onMouseDown(e, el, elementRef, false)
+        } else {
+          onMouseDown && onMouseDown(e, el, elementRef, true)
+        }
+      }}
       style={{
         position: 'absolute',
         left: `${el.x}px`,
@@ -65,15 +74,22 @@ export default function CanvasElement({
         transform: `rotate(${rotation}deg)`,
         transformOrigin: 'center center',
         zIndex: el.zIndex || 1,
-        cursor: isMoving ? 'grabbing' : 'grab',
+        cursor: isMoving ? 'grabbing' : isTextElement ? 'text' : 'grab',
       }}
       className={`group select-none ${
         isSelected ? 'z-40' : ''
       }`}
     >
-      {/* Selection Bounding Box Outline */}
+      {/* Selection Bounding Box Outline (Draggable Border Handle) */}
       {isSelected && (
-        <div className="absolute -inset-1 border-2 border-maroon/90 rounded-sm pointer-events-none z-30 ring-1 ring-gold/40 shadow-xs" />
+        <div
+          onMouseDown={(e) => {
+            e.stopPropagation()
+            onMouseDown && onMouseDown(e, el, elementRef, true)
+          }}
+          className="absolute -inset-1.5 border-2 border-maroon/90 rounded-sm z-30 ring-1 ring-gold/40 shadow-xs cursor-move hover:border-gold transition-colors"
+          title="Drag outline to move"
+        />
       )}
 
       {/* ================= ROTATION HANDLE (TOP STEM & KNOB) ================= */}

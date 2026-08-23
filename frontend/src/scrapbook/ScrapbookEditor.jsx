@@ -250,11 +250,7 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
 
   // ================= TRANSFORM START HANDLERS =================
   const handleStartMove = useCallback(
-    (e, el) => {
-      if (e.target.isContentEditable && document.activeElement === e.target) return
-
-      pagesBeforeTransformRef.current = JSON.parse(JSON.stringify(pagesRef.current))
-
+    (e, el, shouldDrag = true) => {
       // Automatically bring clicked element to the top layer
       const curPages = pagesRef.current
       const curActivePage = curPages[activePageIndex] || curPages[0]
@@ -277,14 +273,18 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
       setPages(updated)
 
       setSelectedElementId(el.id)
-      setTransformState({
-        type: 'move',
-        id: el.id,
-        startX: e.clientX,
-        startY: e.clientY,
-        origX: el.x || 0,
-        origY: el.y || 0,
-      })
+
+      if (shouldDrag) {
+        pagesBeforeTransformRef.current = JSON.parse(JSON.stringify(pagesRef.current))
+        setTransformState({
+          type: 'move',
+          id: el.id,
+          startX: e.clientX,
+          startY: e.clientY,
+          origX: el.x || 0,
+          origY: el.y || 0,
+        })
+      }
     },
     [activePageIndex]
   )
