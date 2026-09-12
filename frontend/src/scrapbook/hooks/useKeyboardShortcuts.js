@@ -22,12 +22,15 @@ export function useKeyboardShortcuts({
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Don't intercept native text inputs
-      const isInput =
-        document.activeElement?.tagName === 'INPUT' ||
-        document.activeElement?.tagName === 'TEXTAREA' ||
-        document.activeElement?.isContentEditable
+      const activeEl = document.activeElement
+      const isNativeField = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA'
+      if (isNativeField) return
 
-      if (isInput) return
+      // If the user is actively typing inside a contentEditable text element, let backspace/delete edit characters
+      const isEditingContent = activeEl?.isContentEditable && selectedElement?.type === 'text'
+      if (isEditingContent && (e.key === 'Delete' || e.key === 'Backspace')) {
+        return
+      }
 
       // Global Undo / Redo Shortcuts
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {

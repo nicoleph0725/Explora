@@ -57,6 +57,7 @@ export default function CanvasElement({
   return (
     <div
       ref={elementRef}
+      tabIndex={-1}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => {
         if (isTextElement) {
@@ -143,9 +144,12 @@ export default function CanvasElement({
       {/* Quick Delete Button on Selected Element */}
       {isSelected && !isInteracting && (
         <button
+          onMouseDown={(e) => {
+            e.stopPropagation()
+          }}
           onClick={(e) => {
             e.stopPropagation()
-            onDelete()
+            onDelete && onDelete()
           }}
           className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-maroon text-white text-[10px] font-bold shadow-md hover:bg-red-600 hover:scale-110 transition-transform flex items-center justify-center cursor-pointer z-50 border border-white"
           title="Delete element"

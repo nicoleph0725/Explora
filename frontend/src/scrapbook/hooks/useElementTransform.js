@@ -51,6 +51,9 @@ export function useElementTransform({
   // 1. Start Drag Move
   const handleStartMove = useCallback(
     (e, el, shouldDrag = true) => {
+      if (el.type !== 'text' && document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur()
+      }
       bringElementToTop(el.id)
       setSelectedElementId(el.id)
 
