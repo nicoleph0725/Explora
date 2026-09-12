@@ -43,18 +43,37 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
       console.warn('Failed to parse local journals:', e)
     }
 
+    // Clean up any stale temp drafts from localStorage that already exist in DB
+    if (dbJournals.length > 0) {
+      const cleanedLocal = localJournals.filter((local) => {
+        const isDuplicateTemp =
+          local.id?.startsWith('journal-') &&
+          dbJournals.some((db) => db.title === local.title)
+        return !isDuplicateTemp
+      })
+
+      if (cleanedLocal.length !== localJournals.length) {
+        localJournals = cleanedLocal
+        try {
+          localStorage.setItem('explora_user_journals', JSON.stringify(cleanedLocal))
+        } catch (e) {
+          console.warn(e)
+        }
+      }
+    }
+
     // Merge: DB journals take priority, overlaying any unique local drafts
     const mergedMap = new Map()
-
-    localJournals.forEach((item) => {
-      if (item && item.id) {
-        mergedMap.set(item.id, { ...item, isCustom: true })
-      }
-    })
 
     dbJournals.forEach((item) => {
       if (item && item.id) {
         mergedMap.set(item.id, { ...item, isDatabase: true })
+      }
+    })
+
+    localJournals.forEach((item) => {
+      if (item && item.id && !mergedMap.has(item.id)) {
+        mergedMap.set(item.id, { ...item, isCustom: true })
       }
     })
 
@@ -98,9 +117,50 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
   }
 
   const handleCreateNew = async () => {
-    const newId = 'journal-' + Date.now()
-    const newJournal = {
-      id: newId,
+    setIsLoading(true)
+
+    const initialPages = [
+      {
+        id: 'p1-' + Date.now(),
+        pageNumber: 1,
+        title: 'First Memory',
+        bgColor: '#FAF6F0',
+        bgPattern: 'dots',
+        elements: [
+          {
+            id: 'el-welcome-title',
+            type: 'text',
+            x: 200,
+            y: 80,
+            width: 360,
+            text: 'New Travel Journal',
+            fontFamily: 'Playfair Display',
+            fontSize: 32,
+            fontWeight: 'bold',
+            color: '#722F37',
+            textAlign: 'center',
+            rotation: 0,
+            zIndex: 1,
+          },
+          {
+            id: 'el-welcome-note',
+            type: 'text',
+            x: 180,
+            y: 160,
+            width: 400,
+            text: 'Click items from the left sidebar to add photos, stickers, and notes! Drag them anywhere on the page.',
+            fontFamily: 'Caveat',
+            fontSize: 22,
+            color: '#555',
+            textAlign: 'center',
+            rotation: 0,
+            zIndex: 2,
+          },
+        ],
+      },
+    ]
+
+    const newJournalData = {
       title: 'New Travel Journal',
       destination: 'My Destination',
       country: 'My Destination',
@@ -108,79 +168,61 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
       coverImage: scrapbookCover,
       cover_image_url: scrapbookCover,
       description: 'Start documenting your new adventures, photos, and polaroids.',
-      pages: [
-        {
-          id: 'p1-' + Date.now(),
-          pageNumber: 1,
-          title: 'First Memory',
-          bgColor: '#FAF6F0',
-          bgPattern: 'dots',
-          elements: [
-            {
-              id: 'el-welcome-title',
-              type: 'text',
-              x: 200,
-              y: 80,
-              width: 360,
-              text: 'New Travel Journal',
-              fontFamily: 'Playfair Display',
-              fontSize: 32,
-              fontWeight: 'bold',
-              color: '#722F37',
-              textAlign: 'center',
-              rotation: 0,
-              zIndex: 1,
-            },
-            {
-              id: 'el-welcome-note',
-              type: 'text',
-              x: 180,
-              y: 160,
-              width: 400,
-              text: 'Click items from the left sidebar to add photos, stickers, and notes! Drag them anywhere on the page.',
-              fontFamily: 'Caveat',
-              fontSize: 22,
-              color: '#555',
-              textAlign: 'center',
-              rotation: 0,
-              zIndex: 2,
-            },
-          ],
-        },
-      ],
+      pages: initialPages,
     }
 
-    // Save to local storage right away so it immediately appears
+    let finalJournal = null
+
+    // 1. Create in Database first if online & logged in
+    const token = localStorage.getItem('token')
+    if (token) {
+      try {
+        const created = await createJournal({
+          title: newJournalData.title,
+          destination: newJournalData.destination,
+          description: newJournalData.description,
+          cover_image_url: null,
+          pages: newJournalData.pages,
+        })
+        if (created?.id) {
+          finalJournal = {
+            ...newJournalData,
+            ...created,
+            id: created.id,
+            isDatabase: true,
+          }
+        }
+      } catch (err) {
+        console.warn('Could not immediately create DB journal, falling back to local draft:', err)
+      }
+    }
+
+    // 2. Fallback to local draft if offline or not logged in
+    if (!finalJournal) {
+      finalJournal = {
+        ...newJournalData,
+        id: 'journal-' + Date.now(),
+        isCustom: true,
+      }
+    }
+
+    // 3. Save ONLY the final journal to localStorage (ensures zero duplicate temp IDs)
     try {
       const existingLocal = JSON.parse(localStorage.getItem('explora_user_journals') || '[]')
-      const updatedLocal = [newJournal, ...existingLocal.filter((j) => j.id !== newId)]
+      const updatedLocal = [
+        finalJournal,
+        ...existingLocal.filter((j) => j.id !== finalJournal.id),
+      ]
       localStorage.setItem('explora_user_journals', JSON.stringify(updatedLocal))
     } catch (e) {
       console.warn('Failed to cache new journal:', e)
     }
 
-    // Attempt to create in Database if online & logged in
-    const token = localStorage.getItem('token')
-    if (token) {
-      try {
-        const created = await createJournal({
-          title: newJournal.title,
-          destination: newJournal.destination,
-          description: newJournal.description,
-          cover_image_url: null,
-          pages: newJournal.pages,
-        })
-        if (created && created.id) {
-          newJournal.id = created.id
-        }
-      } catch (err) {
-        console.warn('Could not immediately create DB journal, will sync on edit:', err)
-      }
-    }
+    setIsLoading(false)
 
-    // Open editor
+    // 4. Open editor
     if (onOpenScrapbook) {
-      onOpenScrapbook(newJournal)
+      onOpenScrapbook(finalJournal)
     }
   }
 
