@@ -2,7 +2,7 @@ import { useState } from 'react'
 import scrapbookCover from './assets/scrapbook_cover.jpg'
 import { loginUser, signUpUser } from './api'
 
-export default function LoginPage(props) {
+export default function LoginPage({ onLogin }) {
   const [isSignUp, setIsSignUp] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -28,8 +28,8 @@ export default function LoginPage(props) {
 
       if (data?.access_token) {
         localStorage.setItem('token', data.access_token)
-        if (props.onLogin) {
-          props.onLogin()
+        if (onLogin) {
+          onLogin()
         }
       }
     } catch (err) {

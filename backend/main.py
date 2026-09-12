@@ -1,15 +1,7 @@
 import os
 import sys
 from pathlib import Path
-
-# Ensure working directory is backend/ so uvicorn can find main:app from anywhere
-backend_dir = Path(__file__).resolve().parent
-os.chdir(backend_dir)
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
-
 from fastapi.concurrency import asynccontextmanager
-
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +9,12 @@ import models  # Must import models first so SQLModel registers tables into meta
 from database import init_db, engine
 from auth.sign_up import router as auth_router
 from journals import router as journals_router
+
+# Ensure working directory is backend/ so uvicorn can find main:app from anywhere
+backend_dir = Path(__file__).resolve().parent
+os.chdir(backend_dir)
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 
 origins = [

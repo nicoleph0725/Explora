@@ -6,7 +6,7 @@ import scrapbookCover from './assets/scrapbook_cover.jpg'
 import { getCurrentUser, getJournals, deleteJournal as apiDeleteJournal, createJournal } from './api'
 import { DEFAULT_SCRAPBOOKS } from './scrapbook/scrapbookData'
 
-export default function Homepage(props) {
+export default function Homepage({ onLogout, onOpenScrapbook }) {
   const [user, setUser] = useState(null)
   const [journals, setJournals] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -92,8 +92,8 @@ export default function Homepage(props) {
   const fullName = user?.full_name || storedName || (user?.email ? user.email : null)
 
   const handleOpenExisting = (scrapbook) => {
-    if (props.onOpenScrapbook) {
-      props.onOpenScrapbook(scrapbook)
+    if (onOpenScrapbook) {
+      onOpenScrapbook(scrapbook)
     }
   }
 
@@ -179,8 +179,8 @@ export default function Homepage(props) {
     }
 
     // Open editor
-    if (props.onOpenScrapbook) {
-      props.onOpenScrapbook(newJournal)
+    if (onOpenScrapbook) {
+      onOpenScrapbook(newJournal)
     }
   }
 
@@ -224,7 +224,7 @@ export default function Homepage(props) {
       <div className="absolute top-20 right-10 w-72 h-72 rounded-full bg-terracotta/5 blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-20 left-10 w-80 h-80 rounded-full bg-sage/10 blur-3xl pointer-events-none"></div>
 
-      <Navbar onLogout={props.onLogout} onNewEntry={handleCreateNew} user={user} />
+      <Navbar onLogout={onLogout} onNewEntry={handleCreateNew} user={user} />
 
       <main className="max-w-5xl mx-auto px-6 pt-10">
         {/* Header Banner */}

@@ -1,5 +1,5 @@
-export default function Navbar(props) {
-  const nameToDisplay = props.user?.full_name || localStorage.getItem('user_full_name')
+export default function Navbar({ onLogout, onNewEntry, user }) {
+  const nameToDisplay = user?.full_name || localStorage.getItem('user_full_name')
 
   return (
     <header className="sticky top-0 z-50 w-full bg-beige-light/80 backdrop-blur-md border-b border-beige-dark/50 shadow-sm">
@@ -11,7 +11,7 @@ export default function Navbar(props) {
         <div className="flex items-center gap-4">
           <button
             id="new-entry-btn"
-            onClick={props.onNewEntry}
+            onClick={onNewEntry}
             className="hidden sm:inline-flex items-center justify-center cursor-pointer"
           >
             + New Entry
@@ -24,10 +24,10 @@ export default function Navbar(props) {
                 👤 {nameToDisplay}
               </li>
             )}
-            {props.onLogout && (
+            {onLogout && (
               <li>
                 <button
-                  onClick={props.onLogout}
+                  onClick={onLogout}
                   className="text-xs font-semibold text-stone-500 hover:text-maroon px-3 py-1.5 rounded-lg border border-beige-dark/60 hover:bg-beige-medium/60 transition-all cursor-pointer"
                 >
                   Sign Out
