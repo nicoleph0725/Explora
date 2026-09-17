@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import TopEditingToolbar from './components/TopEditingToolbar'
 import AssetSidebar from './components/AssetSidebar'
 import ScrapbookCanvas from './components/ScrapbookCanvas'
@@ -11,7 +11,7 @@ import { useElementTransform } from './hooks/useElementTransform'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { getPatternBg } from './utils/canvasPatterns'
 
-export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
+export default function ScrapbookEditor({ scrapbook, onBack }) {
   // Current Journal ID in database (or temporary ID)
   const [journalId, setJournalId] = useState(scrapbook?.id || null)
 
@@ -87,9 +87,11 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
   const bottomScrollRef = useRef(null)
   const fileInputRef = useRef(null)
 
-  // Keep fresh reference of pages synchronized on every render
+  // Keep fresh reference of pages synchronized outside render
   const pagesRef = useRef(pages)
-  pagesRef.current = pages
+  useEffect(() => {
+    pagesRef.current = pages
+  }, [pages])
 
   const activePage = pages[activePageIndex] || pages[0]
   const selectedElement = activePage?.elements.find((el) => el.id === selectedElementId)
@@ -426,7 +428,6 @@ export default function ScrapbookEditor({ scrapbook, onBack, user, onLogout }) {
           onStartMove={handleStartMove}
           onStartResize={handleStartResize}
           onStartRotate={handleStartRotate}
-          onDuplicateElement={handleDuplicateElement}
           canvasRef={canvasRef}
           updateSelectedElement={updateSelectedElement}
           deleteSelectedElement={deleteSelectedElement}

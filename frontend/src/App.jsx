@@ -40,7 +40,6 @@ export default function App() {
       <ScrapbookEditor
         scrapbook={selectedScrapbook}
         onBack={handleBackToHome}
-        onLogout={handleLogout}
       />
     )
   }

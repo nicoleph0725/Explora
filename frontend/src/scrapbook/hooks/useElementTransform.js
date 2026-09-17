@@ -74,14 +74,15 @@ export function useElementTransform({
 
   // 2. Start Rotate
   const handleStartRotate = useCallback(
-    (e, el, elementRef) => {
+    (e, el, targetEl) => {
       e.stopPropagation()
-      if (!elementRef?.current) return
+      const domEl = targetEl?.current || targetEl
+      if (!domEl) return
 
       pagesBeforeTransformRef.current = JSON.parse(JSON.stringify(pagesRef.current))
       bringElementToTop(el.id)
 
-      const rect = elementRef.current.getBoundingClientRect()
+      const rect = domEl.getBoundingClientRect()
       const centerX = rect.left + rect.width / 2
       const centerY = rect.top + rect.height / 2
       const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI)
@@ -101,9 +102,10 @@ export function useElementTransform({
 
   // 3. Start Resize
   const handleStartResize = useCallback(
-    (e, handle, el, elementRef) => {
+    (e, handle, el, targetEl) => {
       e.stopPropagation()
-      if (!elementRef?.current) return
+      const domEl = targetEl?.current || targetEl
+      if (!domEl) return
 
       pagesBeforeTransformRef.current = JSON.parse(JSON.stringify(pagesRef.current))
       bringElementToTop(el.id)
@@ -111,7 +113,7 @@ export function useElementTransform({
       const resizeData = calculateResizeInit({
         el,
         handle,
-        domEl: elementRef.current,
+        domEl,
       })
 
       setSelectedElementId(el.id)

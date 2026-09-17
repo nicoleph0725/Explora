@@ -4,7 +4,6 @@ import shanghaiCover from './assets/shanghai_cover.jpeg'
 import TokyoCover from './assets/tokyo_cover.jpeg'
 import scrapbookCover from './assets/scrapbook_cover.jpg'
 import { getCurrentUser, getJournals, deleteJournal as apiDeleteJournal, createJournal } from './api'
-import { DEFAULT_SCRAPBOOKS } from './scrapbook/scrapbookData'
 
 export default function Homepage({ onLogout, onOpenScrapbook }) {
   const [user, setUser] = useState(null)
@@ -13,8 +12,6 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
 
   // Load all journals for the logged-in user (from Backend Database + User-Scoped Cache)
   const loadAllJournals = useCallback(async () => {
-    setIsLoading(true)
-
     const token = localStorage.getItem('token')
     if (!token) {
       setJournals([])
@@ -88,23 +85,34 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
   }, [])
 
   useEffect(() => {
-    // Fetch profile
-    const fetchProfile = async () => {
+    let isMounted = true
+
+    const initialize = async () => {
       const token = localStorage.getItem('token')
-      if (!token) return
-      try {
-        const userData = await getCurrentUser()
-        setUser(userData)
-        if (userData?.full_name) {
-          localStorage.setItem('user_full_name', userData.full_name)
+      if (token) {
+        try {
+          const userData = await getCurrentUser()
+          if (isMounted) {
+            setUser(userData)
+            if (userData?.full_name) {
+              localStorage.setItem('user_full_name', userData.full_name)
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch user profile:', err)
         }
-      } catch (err) {
-        console.error('Failed to fetch user profile:', err)
+      }
+
+      if (isMounted) {
+        await loadAllJournals()
       }
     }
 
-    fetchProfile()
-    loadAllJournals()
+    initialize()
+
+    return () => {
+      isMounted = false
+    }
   }, [loadAllJournals])
 
   const storedName = localStorage.getItem('user_full_name')
@@ -311,108 +319,116 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
         </div>
 
         {/* Main Journals Grid Container */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {journals.map((scrapbook, idx) => {
-            const isCustom = scrapbook.isCustom || scrapbook.isDatabase
-            const coverImg =
-              scrapbook.cover_image_url ||
-              scrapbook.coverImage ||
-              (scrapbook.id === 'shanghai'
-                ? shanghaiCover
-                : scrapbook.id === 'tokyo'
-                ? TokyoCover
-                : scrapbookCover)
-
-            const pageCount =
-              scrapbook.page_count ||
-              (scrapbook.pages ? scrapbook.pages.length : 1)
-
-            return (
-              <div
-                key={scrapbook.id || idx}
-                onClick={() => handleOpenExisting(scrapbook)}
-                className={`polaroid-card bg-parchment rounded-xl shadow-md hover:shadow-xl border border-beige-dark p-4 relative group cursor-pointer transform hover:-translate-y-1 transition-all duration-300 ${
-                  idx % 2 === 1 ? 'rotate-[1deg]' : 'rotate-[-1deg]'
-                }`}
-              >
-                <div
-                  className={`w-20 h-5 washi-tape absolute -top-2.5 left-1/2 -translate-x-1/2 z-10 ${
-                    idx % 2 === 1 ? 'rotate-[3deg]' : 'rotate-[-2deg]'
-                  }`}
-                ></div>
-
-                {/* Delete Button for custom journals */}
-                {isCustom && (
-                  <button
-                    onClick={(e) => handleDeleteJournal(scrapbook.id, e)}
-                    className="absolute top-3 right-3 z-20 w-7 h-7 rounded-full bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs cursor-pointer"
-                    title="Delete Journal"
-                  >
-                    🗑️
-                  </button>
-                )}
-
-                <div className="relative aspect-4/3 rounded-lg overflow-hidden bg-stone-200 mb-3">
-                  <img
-                    src={coverImg}
-                    alt={scrapbook.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    style={{ objectPosition: 'center 30%' }}
-                  />
-                  <span className="absolute top-2 left-2 bg-maroon/90 text-white font-mono text-[10px] px-2 py-0.5 rounded shadow-xs">
-                    {pageCount} {pageCount === 1 ? 'PAGE' : 'PAGES'}
-                  </span>
-
-                  {isCustom && (
-                    <span className="absolute bottom-2 left-2 bg-sage/90 text-white font-mono text-[9px] px-2 py-0.5 rounded shadow-xs">
-                      ★ MY SCRAPBOOK
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-serif font-bold text-lg text-maroon-dark group-hover:text-terracotta transition-colors">
-                      {scrapbook.title}
-                    </h3>
-                    <p className="text-xs text-stone-500 font-sans">
-                      {scrapbook.destination || scrapbook.country || 'Travel Journal'} •{' '}
-                      {scrapbook.date || '2026'}
-                    </p>
-                  </div>
-                  <div className="passport-stamp text-[8px] w-10 h-10 p-0 leading-none shrink-0 border-sage text-sage rotate-[-6deg]">
-                    <span>EXPLORA</span>
-                  </div>
-                </div>
-
-                <p className="font-handwriting text-base text-stone-600 mt-2 line-clamp-2">
-                  "{scrapbook.description || 'Memories, photos and adventures captured across the world.'}"
-                </p>
-
-                <div className="mt-3 pt-3 border-t border-dashed border-beige-dark flex items-center justify-between text-xs font-mono text-terracotta group-hover:text-maroon font-semibold">
-                  <span>Open Scrapbook</span>
-                  <span className="group-hover:translate-x-1 transition-transform">→</span>
-                </div>
-              </div>
-            )
-          })}
-
-          {/* Empty Add Scrapbook Card */}
-          <div
-            onClick={handleCreateNew}
-            className="border-2 border-dashed border-beige-dark rounded-xl p-8 flex flex-col items-center justify-center text-center bg-parchment/50 hover:bg-parchment hover:border-terracotta transition-all duration-200 cursor-pointer min-h-[280px] group"
-          >
-            <div className="w-12 h-12 rounded-full bg-beige-medium group-hover:bg-terracotta/10 flex items-center justify-center text-terracotta text-xl mb-3 shadow-xs font-bold transition-transform group-hover:scale-110">
-              +
-            </div>
-            <h4 className="font-serif font-bold text-maroon-dark text-base group-hover:text-terracotta transition-colors">
-              Create New Journal
-            </h4>
-            <p className="font-handwriting text-base text-stone-500 mt-1 max-w-[200px]">
-              Start a new freeform canvas with polaroids, washi tape & stickers.
-            </p>
+        {isLoading ? (
+          <div className="py-24 flex flex-col items-center justify-center text-center">
+            <div className="w-10 h-10 border-4 border-maroon/20 border-t-maroon rounded-full animate-spin mb-4"></div>
+            <p className="font-serif font-bold text-xl text-maroon-dark">Opening your travel trunk...</p>
+            <p className="font-handwriting text-base text-stone-500 mt-1">Retrieving your scrapbooks & memories</p>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {journals.map((scrapbook, idx) => {
+              const isCustom = scrapbook.isCustom || scrapbook.isDatabase
+              const coverImg =
+                scrapbook.cover_image_url ||
+                scrapbook.coverImage ||
+                (scrapbook.id === 'shanghai'
+                  ? shanghaiCover
+                  : scrapbook.id === 'tokyo'
+                  ? TokyoCover
+                  : scrapbookCover)
+
+              const pageCount =
+                scrapbook.page_count ||
+                (scrapbook.pages ? scrapbook.pages.length : 1)
+
+              return (
+                <div
+                  key={scrapbook.id || idx}
+                  onClick={() => handleOpenExisting(scrapbook)}
+                  className={`polaroid-card bg-parchment rounded-xl shadow-md hover:shadow-xl border border-beige-dark p-4 relative group cursor-pointer transform hover:-translate-y-1 transition-all duration-300 ${
+                    idx % 2 === 1 ? 'rotate-[1deg]' : 'rotate-[-1deg]'
+                  }`}
+                >
+                  <div
+                    className={`w-20 h-5 washi-tape absolute -top-2.5 left-1/2 -translate-x-1/2 z-10 ${
+                      idx % 2 === 1 ? 'rotate-[3deg]' : 'rotate-[-2deg]'
+                    }`}
+                  ></div>
+
+                  {/* Delete Button for custom journals */}
+                  {isCustom && (
+                    <button
+                      onClick={(e) => handleDeleteJournal(scrapbook.id, e)}
+                      className="absolute top-3 right-3 z-20 w-7 h-7 rounded-full bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs cursor-pointer"
+                      title="Delete Journal"
+                    >
+                      🗑️
+                    </button>
+                  )}
+
+                  <div className="relative aspect-4/3 rounded-lg overflow-hidden bg-stone-200 mb-3">
+                    <img
+                      src={coverImg}
+                      alt={scrapbook.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      style={{ objectPosition: 'center 30%' }}
+                    />
+                    <span className="absolute top-2 left-2 bg-maroon/90 text-white font-mono text-[10px] px-2 py-0.5 rounded shadow-xs">
+                      {pageCount} {pageCount === 1 ? 'PAGE' : 'PAGES'}
+                    </span>
+
+                    {isCustom && (
+                      <span className="absolute bottom-2 left-2 bg-sage/90 text-white font-mono text-[9px] px-2 py-0.5 rounded shadow-xs">
+                        ★ MY SCRAPBOOK
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-serif font-bold text-lg text-maroon-dark group-hover:text-terracotta transition-colors">
+                        {scrapbook.title}
+                      </h3>
+                      <p className="text-xs text-stone-500 font-sans">
+                        {scrapbook.destination || scrapbook.country || 'Travel Journal'} •{' '}
+                        {scrapbook.date || '2026'}
+                      </p>
+                    </div>
+                    <div className="passport-stamp text-[8px] w-10 h-10 p-0 leading-none shrink-0 border-sage text-sage rotate-[-6deg]">
+                      <span>EXPLORA</span>
+                    </div>
+                  </div>
+
+                  <p className="font-handwriting text-base text-stone-600 mt-2 line-clamp-2">
+                    "{scrapbook.description || 'Memories, photos and adventures captured across the world.'}"
+                  </p>
+
+                  <div className="mt-3 pt-3 border-t border-dashed border-beige-dark flex items-center justify-between text-xs font-mono text-terracotta group-hover:text-maroon font-semibold">
+                    <span>Open Scrapbook</span>
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Empty Add Scrapbook Card */}
+            <div
+              onClick={handleCreateNew}
+              className="border-2 border-dashed border-beige-dark rounded-xl p-8 flex flex-col items-center justify-center text-center bg-parchment/50 hover:bg-parchment hover:border-terracotta transition-all duration-200 cursor-pointer min-h-[280px] group"
+            >
+              <div className="w-12 h-12 rounded-full bg-beige-medium group-hover:bg-terracotta/10 flex items-center justify-center text-terracotta text-xl mb-3 shadow-xs font-bold transition-transform group-hover:scale-110">
+                +
+              </div>
+              <h4 className="font-serif font-bold text-maroon-dark text-base group-hover:text-terracotta transition-colors">
+                Create New Journal
+              </h4>
+              <p className="font-handwriting text-base text-stone-500 mt-1 max-w-[200px]">
+                Start a new freeform canvas with polaroids, washi tape & stickers.
+              </p>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

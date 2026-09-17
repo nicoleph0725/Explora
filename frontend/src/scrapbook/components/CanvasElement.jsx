@@ -36,13 +36,11 @@ export default function CanvasElement({
   onStartRotate,
   onUpdate,
   onDelete,
-  onDuplicate,
 }) {
   const elementRef = useRef(null)
 
   const rotation = el.rotation || 0
   const isMoving = isInteracting && interactionType === 'move'
-  const isResizing = isInteracting && interactionType === 'resize'
   const isRotating = isInteracting && interactionType === 'rotate'
 
   const cornerHandles = [
@@ -105,7 +103,7 @@ export default function CanvasElement({
           <div
             onMouseDown={(e) => {
               e.stopPropagation()
-              onStartRotate && onStartRotate(e, el, elementRef)
+              onStartRotate && onStartRotate(e, el, elementRef.current)
             }}
             style={{ cursor: isRotating ? 'grabbing' : 'grab' }}
             className={`absolute left-1/2 -top-9 -translate-x-1/2 w-6 h-6 rounded-full bg-white border-2 border-maroon text-maroon shadow-md flex items-center justify-center hover:bg-maroon hover:text-gold hover:scale-115 transition-transform z-50 ${
@@ -132,7 +130,10 @@ export default function CanvasElement({
               key={h.id}
               onMouseDown={(e) => {
                 e.stopPropagation()
-                onStartResize && onStartResize(e, h.id, el, elementRef)
+                if (onStartResize) {
+                  const domNode = e.currentTarget.parentElement
+                  onStartResize(e, h.id, el, domNode)
+                }
               }}
               style={{ cursor }}
               className={`absolute ${h.className} w-3.5 h-3.5 rounded-xs bg-white border-2 border-maroon shadow-xs hover:bg-gold hover:border-maroon-dark hover:scale-125 transition-transform z-40`}

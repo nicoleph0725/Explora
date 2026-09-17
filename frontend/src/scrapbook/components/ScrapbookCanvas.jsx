@@ -11,7 +11,6 @@ export default function ScrapbookCanvas({
   onStartMove,
   onStartResize,
   onStartRotate,
-  onDuplicateElement,
   canvasRef,
   updateSelectedElement,
   deleteSelectedElement,
@@ -103,7 +102,6 @@ export default function ScrapbookCanvas({
                   onStartRotate={onStartRotate}
                   onUpdate={(updates) => updateSelectedElement(updates, el.id)}
                   onDelete={() => deleteSelectedElement(el.id)}
-                  onDuplicate={() => onDuplicateElement && onDuplicateElement(el.id)}
                 />
               )
             })}
