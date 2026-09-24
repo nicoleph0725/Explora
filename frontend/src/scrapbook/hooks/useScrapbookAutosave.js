@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { saveJournalPages, createJournal } from '../../api'
+import { saveJournalPages, createJournal, isUUID } from '../../api'
 
 /**
  * Manages debounced (700ms) synchronization of scrapbook pages and title
@@ -44,7 +44,6 @@ export function useScrapbookAutosave({
           description: scrapbook?.description || 'Travel scrapbook memories',
           page_count: pages.length,
           pages,
-          isCustom: true,
           updated_at: new Date().toISOString(),
         }
         const newJournalsList = [
@@ -65,13 +64,7 @@ export function useScrapbookAutosave({
 
       // 3. Persist to Backend Database
       try {
-        const isUUID =
-          journalId &&
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-            journalId
-          )
-
-        if (isUUID) {
+        if (isUUID(journalId)) {
           await saveJournalPages(journalId, {
             title: scrapbookTitle,
             pages,
@@ -91,7 +84,7 @@ export function useScrapbookAutosave({
             try {
               const localList = JSON.parse(localStorage.getItem('explora_user_journals') || '[]')
               const updatedList = localList.map((j) =>
-                j.id === oldId ? { ...j, id: created.id, isDatabase: true } : j
+                j.id === oldId ? { ...j, id: created.id } : j
               )
               localStorage.setItem('explora_user_journals', JSON.stringify(updatedList))
             } catch (e) {

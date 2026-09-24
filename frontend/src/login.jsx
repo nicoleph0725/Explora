@@ -102,7 +102,7 @@ export default function LoginPage({ onLogin }) {
           </h1>
 
           <p className="text-stone-600 text-base sm:text-lg max-w-xl mx-auto lg:mx-0 leading-relaxed mb-8 font-sans">
-            Pin polaroids, embed video memories, doodle handwritten notes, and toggle effortlessly between freeform layout editing and movie-like slideshow presentations.
+            Pin polaroids, embed video memories, and write notes to make your jounrey's truly unforgettable
           </p>
 
           {/* Scrapbook Visual Feature Card (Hero Collage Preview) */}
@@ -134,7 +134,7 @@ export default function LoginPage({ onLogin }) {
                   "Every destination has a story waiting to be told..."
                 </p>
                 <div className="passport-stamp text-[9px] w-12 h-12 p-0 leading-none shrink-0 ml-2">
-                  <span>TOKYO</span>
+                  <span>BEIJING</span>
                   <span className="font-sans text-[7px]">PASSED</span>
                 </div>
               </div>
@@ -144,7 +144,7 @@ export default function LoginPage({ onLogin }) {
             <div className="absolute -bottom-5 -right-4 bg-amber-100/90 text-stone-800 p-3 rounded shadow-md border border-amber-200/80 rotate-[6deg] max-w-[170px] hidden sm:block">
               <div className="w-8 h-3 washi-tape absolute -top-1.5 left-1/2 -translate-x-1/2 rotate-[-2deg]"></div>
               <p className="font-handwriting text-sm text-stone-700 leading-tight">
-                ✏️ Add photos, pen drawings & videos anywhere!
+                Add photos, text, stamps and more anywhere!
               </p>
             </div>
           </div>

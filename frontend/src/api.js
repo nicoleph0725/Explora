@@ -109,4 +109,14 @@ export async function deleteJournal(journalId) {
   return response.data
 }
 
+/**
+ * Check if an ID is a valid backend UUID
+ */
+export function isUUID(id) {
+  return (
+    typeof id === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+  )
+}
+
 export default api

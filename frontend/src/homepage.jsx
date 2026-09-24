@@ -3,7 +3,7 @@ import Navbar from './navbar'
 import shanghaiCover from './assets/shanghai_cover.jpeg'
 import TokyoCover from './assets/tokyo_cover.jpeg'
 import scrapbookCover from './assets/scrapbook_cover.jpg'
-import { getCurrentUser, getJournals, deleteJournal as apiDeleteJournal, createJournal } from './api'
+import { getCurrentUser, getJournals, deleteJournal as apiDeleteJournal, createJournal, isUUID } from './api'
 
 export default function Homepage({ onLogout, onOpenScrapbook }) {
   const [user, setUser] = useState(null)
@@ -64,13 +64,13 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
 
     dbJournals.forEach((item) => {
       if (item && item.id) {
-        mergedMap.set(item.id, { ...item, isDatabase: true })
+        mergedMap.set(item.id, item)
       }
     })
 
     localJournals.forEach((item) => {
       if (item && item.id && !mergedMap.has(item.id)) {
-        mergedMap.set(item.id, { ...item, isCustom: true })
+        mergedMap.set(item.id, item)
       }
     })
 
@@ -197,7 +197,6 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
             ...newJournalData,
             ...created,
             id: created.id,
-            isDatabase: true,
           }
         }
       } catch (err) {
@@ -210,7 +209,6 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
       finalJournal = {
         ...newJournalData,
         id: 'journal-' + Date.now(),
-        isCustom: true,
       }
     }
 
@@ -250,13 +248,7 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
     }
 
     // 2. Remove from Database if UUID
-    const isUUID =
-      journalId &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        journalId
-      )
-
-    if (isUUID) {
+    if (isUUID(journalId)) {
       try {
         await apiDeleteJournal(journalId)
       } catch (err) {
@@ -328,7 +320,9 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {journals.map((scrapbook, idx) => {
-              const isCustom = scrapbook.isCustom || scrapbook.isDatabase
+              const isDatabase = isUUID(scrapbook.id)
+              const isLocalDraft = Boolean(scrapbook.id?.startsWith('journal-'))
+              const isUserScrapbook = isDatabase || isLocalDraft
               const coverImg =
                 scrapbook.cover_image_url ||
                 scrapbook.coverImage ||
@@ -356,8 +350,8 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
                     }`}
                   ></div>
 
-                  {/* Delete Button for custom journals */}
-                  {isCustom && (
+                  {/* Delete Button for user journals */}
+                  {isUserScrapbook && (
                     <button
                       onClick={(e) => handleDeleteJournal(scrapbook.id, e)}
                       className="absolute top-3 right-3 z-20 w-7 h-7 rounded-full bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs cursor-pointer"
@@ -378,7 +372,7 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
                       {pageCount} {pageCount === 1 ? 'PAGE' : 'PAGES'}
                     </span>
 
-                    {isCustom && (
+                    {isUserScrapbook && (
                       <span className="absolute bottom-2 left-2 bg-sage/90 text-white font-mono text-[9px] px-2 py-0.5 rounded shadow-xs">
                         ★ MY SCRAPBOOK
                       </span>
