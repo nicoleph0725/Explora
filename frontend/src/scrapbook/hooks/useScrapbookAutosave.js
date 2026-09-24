@@ -25,32 +25,12 @@ export function useScrapbookAutosave({
     setSaveStatus('saving')
 
     const debounceTimer = setTimeout(async () => {
-      // 1. Save to LocalStorage Backup
+      // 1. Save to LocalStorage Backup for current scrapbook editor
       try {
         localStorage.setItem(
           `explora_scrapbook_${journalId || 'temp'}`,
           JSON.stringify({ title: scrapbookTitle, pages })
         )
-
-        const existingJournals = JSON.parse(localStorage.getItem('explora_user_journals') || '[]')
-        const targetId = journalId || scrapbook?.id || 'temp'
-        const updatedJournalEntry = {
-          id: targetId,
-          title: scrapbookTitle,
-          destination: scrapbook?.destination || scrapbook?.country || 'My Destination',
-          country: scrapbook?.country || 'My Destination',
-          date: scrapbook?.date || 'Aug 2026',
-          coverImage: scrapbook?.coverImage || scrapbook?.cover_image_url || null,
-          description: scrapbook?.description || 'Travel scrapbook memories',
-          page_count: pages.length,
-          pages,
-          updated_at: new Date().toISOString(),
-        }
-        const newJournalsList = [
-          updatedJournalEntry,
-          ...existingJournals.filter((j) => j.id !== targetId && j.id !== scrapbook?.id),
-        ]
-        localStorage.setItem('explora_user_journals', JSON.stringify(newJournalsList))
       } catch (err) {
         console.warn('LocalStorage backup error:', err)
       }
@@ -79,17 +59,7 @@ export function useScrapbookAutosave({
             pages,
           })
           if (created?.id) {
-            const oldId = journalId || scrapbook?.id
             setJournalId(created.id)
-            try {
-              const localList = JSON.parse(localStorage.getItem('explora_user_journals') || '[]')
-              const updatedList = localList.map((j) =>
-                j.id === oldId ? { ...j, id: created.id } : j
-              )
-              localStorage.setItem('explora_user_journals', JSON.stringify(updatedList))
-            } catch (e) {
-              console.warn(e)
-            }
           }
           setSaveStatus('saved')
         }

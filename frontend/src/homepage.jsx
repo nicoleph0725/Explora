@@ -1,17 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import Navbar from './navbar'
-import shanghaiCover from './assets/shanghai_cover.jpeg'
-import TokyoCover from './assets/tokyo_cover.jpeg'
 import scrapbookCover from './assets/scrapbook_cover.jpg'
-import { getCurrentUser, getJournals, deleteJournal as apiDeleteJournal, createJournal, isUUID } from './api'
+import { getCurrentUser, getJournals, deleteJournal as apiDeleteJournal, createJournal } from './api'
 
 export default function Homepage({ onLogout, onOpenScrapbook }) {
   const [user, setUser] = useState(null)
   const [journals, setJournals] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState(null)
 
-  // Load all journals for the logged-in user (from Backend Database + User-Scoped Cache)
+  // Load all journals directly from the Database
   const loadAllJournals = useCallback(async () => {
+    setIsLoading(true)
+    setErrorMessage(null)
+
     const token = localStorage.getItem('token')
     if (!token) {
       setJournals([])
@@ -19,69 +21,29 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
       return
     }
 
-    let dbJournals = []
     try {
       const remoteData = await getJournals()
       if (Array.isArray(remoteData)) {
-        dbJournals = remoteData
+        const sorted = [...remoteData].sort((a, b) => {
+          const dateA = new Date(a.updated_at || a.created_at || 0)
+          const dateB = new Date(b.updated_at || b.created_at || 0)
+          return dateB - dateA
+        })
+        setJournals(sorted)
+      } else {
+        setJournals([])
       }
     } catch (err) {
-      console.warn('Could not fetch database journals:', err)
+      console.error('Could not fetch database journals:', err)
+      setErrorMessage(
+        !navigator.onLine
+          ? 'No internet connection. Please check your network and try again.'
+          : 'Unable to connect to the server. Please check your connection and try again.'
+      )
+      setJournals([])
+    } finally {
+      setIsLoading(false)
     }
-
-    // Read user-scoped local fallback if offline
-    let localJournals = []
-    try {
-      const savedLocal = localStorage.getItem('explora_user_journals')
-      if (savedLocal) {
-        localJournals = JSON.parse(savedLocal)
-      }
-    } catch (e) {
-      console.warn('Failed to parse local journals:', e)
-    }
-
-    // Clean up any stale temp drafts from localStorage that already exist in DB
-    if (dbJournals.length > 0) {
-      const cleanedLocal = localJournals.filter((local) => {
-        const isDuplicateTemp =
-          local.id?.startsWith('journal-') &&
-          dbJournals.some((db) => db.title === local.title)
-        return !isDuplicateTemp
-      })
-
-      if (cleanedLocal.length !== localJournals.length) {
-        localJournals = cleanedLocal
-        try {
-          localStorage.setItem('explora_user_journals', JSON.stringify(cleanedLocal))
-        } catch (e) {
-          console.warn(e)
-        }
-      }
-    }
-
-    // Merge: DB journals take priority, overlaying any unique local drafts
-    const mergedMap = new Map()
-
-    dbJournals.forEach((item) => {
-      if (item && item.id) {
-        mergedMap.set(item.id, item)
-      }
-    })
-
-    localJournals.forEach((item) => {
-      if (item && item.id && !mergedMap.has(item.id)) {
-        mergedMap.set(item.id, item)
-      }
-    })
-
-    const allList = Array.from(mergedMap.values()).sort((a, b) => {
-      const dateA = new Date(a.updated_at || a.created_at || 0)
-      const dateB = new Date(b.updated_at || b.created_at || 0)
-      return dateB - dateA
-    })
-
-    setJournals(allList)
-    setIsLoading(false)
   }, [])
 
   useEffect(() => {
@@ -168,67 +130,28 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
       },
     ]
 
-    const newJournalData = {
-      title: 'New Travel Journal',
-      destination: 'My Destination',
-      country: 'My Destination',
-      date: 'Aug 2026',
-      coverImage: scrapbookCover,
-      cover_image_url: scrapbookCover,
-      description: 'Start documenting your new adventures, photos, and polaroids.',
-      pages: initialPages,
-    }
-
-    let finalJournal = null
-
-    // 1. Create in Database first if online & logged in
-    const token = localStorage.getItem('token')
-    if (token) {
-      try {
-        const created = await createJournal({
-          title: newJournalData.title,
-          destination: newJournalData.destination,
-          description: newJournalData.description,
-          cover_image_url: null,
-          pages: newJournalData.pages,
-        })
-        if (created?.id) {
-          finalJournal = {
-            ...newJournalData,
-            ...created,
-            id: created.id,
-          }
-        }
-      } catch (err) {
-        console.warn('Could not immediately create DB journal, falling back to local draft:', err)
-      }
-    }
-
-    // 2. Fallback to local draft if offline or not logged in
-    if (!finalJournal) {
-      finalJournal = {
-        ...newJournalData,
-        id: 'journal-' + Date.now(),
-      }
-    }
-
-    // 3. Save ONLY the final journal to localStorage (ensures zero duplicate temp IDs)
     try {
-      const existingLocal = JSON.parse(localStorage.getItem('explora_user_journals') || '[]')
-      const updatedLocal = [
-        finalJournal,
-        ...existingLocal.filter((j) => j.id !== finalJournal.id),
-      ]
-      localStorage.setItem('explora_user_journals', JSON.stringify(updatedLocal))
-    } catch (e) {
-      console.warn('Failed to cache new journal:', e)
-    }
+      const created = await createJournal({
+        title: 'New Travel Journal',
+        destination: 'My Destination',
+        description: 'Start documenting your new adventures, photos, and polaroids.',
+        cover_image_url: null,
+        pages: initialPages,
+      })
 
-    setIsLoading(false)
+      setIsLoading(false)
 
-    // 4. Open editor
-    if (onOpenScrapbook) {
-      onOpenScrapbook(finalJournal)
+      if (created?.id && onOpenScrapbook) {
+        onOpenScrapbook(created)
+      }
+    } catch (err) {
+      console.error('Failed to create journal:', err)
+      setIsLoading(false)
+      alert(
+        !navigator.onLine
+          ? 'No internet connection. Cannot create a new scrapbook while offline.'
+          : 'Unable to connect to the server. Please check your connection and try again.'
+      )
     }
   }
 
@@ -238,26 +161,17 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
       return
     }
 
-    // 1. Remove from local storage
     try {
-      const existingLocal = JSON.parse(localStorage.getItem('explora_user_journals') || '[]')
-      const updatedLocal = existingLocal.filter((j) => j.id !== journalId)
-      localStorage.setItem('explora_user_journals', JSON.stringify(updatedLocal))
+      await apiDeleteJournal(journalId)
+      setJournals((prev) => prev.filter((j) => j.id !== journalId))
     } catch (err) {
-      console.warn('Failed to update local storage on delete:', err)
+      console.error('Failed to delete journal from database:', err)
+      alert(
+        !navigator.onLine
+          ? 'No internet connection. Cannot delete scrapbook while offline.'
+          : 'Failed to delete journal from server. Please try again.'
+      )
     }
-
-    // 2. Remove from Database if UUID
-    if (isUUID(journalId)) {
-      try {
-        await apiDeleteJournal(journalId)
-      } catch (err) {
-        console.warn('Failed to delete journal from database:', err)
-      }
-    }
-
-    // 3. Update state
-    setJournals((prev) => prev.filter((j) => j.id !== journalId))
   }
 
   return (
@@ -310,8 +224,24 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
           </button>
         </div>
 
-        {/* Main Journals Grid Container */}
-        {isLoading ? (
+        {/* Main Content: Error Message, Loading Spinner, or Journals Grid */}
+        {errorMessage ? (
+          <div className="py-20 flex flex-col items-center justify-center text-center bg-parchment/60 rounded-xl border border-dashed border-red-300 p-8 shadow-xs">
+            <div className="text-4xl mb-3">📡</div>
+            <h3 className="font-serif font-bold text-xl text-maroon-dark mb-1">
+              {errorMessage}
+            </h3>
+            <p className="font-sans text-stone-600 max-w-md mb-6 text-sm">
+              We couldn't connect to your travel vault. Please verify your internet connection.
+            </p>
+            <button
+              onClick={loadAllJournals}
+              className="px-6 py-2.5 rounded-full bg-maroon hover:bg-maroon-dark text-white font-bold text-xs shadow-md transition cursor-pointer"
+            >
+              Retry Connection
+            </button>
+          </div>
+        ) : isLoading ? (
           <div className="py-24 flex flex-col items-center justify-center text-center">
             <div className="w-10 h-10 border-4 border-maroon/20 border-t-maroon rounded-full animate-spin mb-4"></div>
             <p className="font-serif font-bold text-xl text-maroon-dark">Opening your travel trunk...</p>
@@ -320,17 +250,10 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {journals.map((scrapbook, idx) => {
-              const isDatabase = isUUID(scrapbook.id)
-              const isLocalDraft = Boolean(scrapbook.id?.startsWith('journal-'))
-              const isUserScrapbook = isDatabase || isLocalDraft
               const coverImg =
                 scrapbook.cover_image_url ||
                 scrapbook.coverImage ||
-                (scrapbook.id === 'shanghai'
-                  ? shanghaiCover
-                  : scrapbook.id === 'tokyo'
-                  ? TokyoCover
-                  : scrapbookCover)
+                scrapbookCover
 
               const pageCount =
                 scrapbook.page_count ||
@@ -350,16 +273,14 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
                     }`}
                   ></div>
 
-                  {/* Delete Button for user journals */}
-                  {isUserScrapbook && (
-                    <button
-                      onClick={(e) => handleDeleteJournal(scrapbook.id, e)}
-                      className="absolute top-3 right-3 z-20 w-7 h-7 rounded-full bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs cursor-pointer"
-                      title="Delete Journal"
-                    >
-                      🗑️
-                    </button>
-                  )}
+                  {/* Delete Button */}
+                  <button
+                    onClick={(e) => handleDeleteJournal(scrapbook.id, e)}
+                    className="absolute top-3 right-3 z-20 w-7 h-7 rounded-full bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs cursor-pointer"
+                    title="Delete Journal"
+                  >
+                    🗑️
+                  </button>
 
                   <div className="relative aspect-4/3 rounded-lg overflow-hidden bg-stone-200 mb-3">
                     <img
@@ -372,11 +293,9 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
                       {pageCount} {pageCount === 1 ? 'PAGE' : 'PAGES'}
                     </span>
 
-                    {isUserScrapbook && (
-                      <span className="absolute bottom-2 left-2 bg-sage/90 text-white font-mono text-[9px] px-2 py-0.5 rounded shadow-xs">
-                        ★ MY SCRAPBOOK
-                      </span>
-                    )}
+                    <span className="absolute bottom-2 left-2 bg-sage/90 text-white font-mono text-[9px] px-2 py-0.5 rounded shadow-xs">
+                      ★ MY SCRAPBOOK
+                    </span>
                   </div>
 
                   <div className="flex items-start justify-between gap-2">
