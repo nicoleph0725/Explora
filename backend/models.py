@@ -38,8 +38,8 @@ class Journal(SQLModel, table=True):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     is_public: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=datetime.now(timezone.utc))
 
     # Relationships
     user: Optional[User] = Relationship(back_populates="journals")
@@ -70,8 +70,8 @@ class Page(SQLModel, table=True):
     # Stored as JSON / JSONB for flexible layout & fast loading
     elements: List[Dict[str, Any]] = Field(default=[], sa_column=Column(JSON))
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=datetime.now(timezone.utc))
 
     # Relationships
     journal: Optional[Journal] = Relationship(back_populates="pages")
@@ -95,7 +95,7 @@ class MediaAsset(SQLModel, table=True):
     width: Optional[int] = None
     height: Optional[int] = None
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now(timezone.utc))
 
     # Relationships
     user: Optional[User] = Relationship(back_populates="media_assets")

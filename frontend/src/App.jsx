@@ -30,6 +30,10 @@ export default function App() {
     setCurrentView('home')
     setSelectedScrapbook(null)
   }
+  
+  //=======================
+  // compenent's displayed
+  //=======================
 
   if (!isLoggedIn) {
     return <LoginPage onLogin={() => setIsLoggedIn(true)} />
