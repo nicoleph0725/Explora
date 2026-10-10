@@ -150,6 +150,20 @@ def create_journal(
                     "textAlign": "center",
                     "rotation": 0,
                     "zIndex": 1
+                },
+                {
+                    "id": "el-welcome-note",
+                    "type": "text",
+                    "x": 180,
+                    "y": 160,
+                    "width": 400,
+                    "text": "Click items from the left sidebar to add photos, stickers, and notes! Drag them anywhere on the page.",
+                    "fontFamily": "Caveat",
+                    "fontSize": 22,
+                    "color": "#555",
+                    "textAlign": "center",
+                    "rotation": 0,
+                    "zIndex": 2
                 }
             ]
         )

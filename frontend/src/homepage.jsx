@@ -89,54 +89,12 @@ export default function Homepage({ onLogout, onOpenScrapbook }) {
   const handleCreateNew = async () => {
     setIsLoading(true)
 
-    const initialPages = [
-      {
-        id: 'p1-' + Date.now(),
-        pageNumber: 1,
-        title: 'First Memory',
-        bgColor: '#FAF6F0',
-        bgPattern: 'dots',
-        elements: [
-          {
-            id: 'el-welcome-title',
-            type: 'text',
-            x: 200,
-            y: 80,
-            width: 360,
-            text: 'New Travel Journal',
-            fontFamily: 'Playfair Display',
-            fontSize: 32,
-            fontWeight: 'bold',
-            color: '#722F37',
-            textAlign: 'center',
-            rotation: 0,
-            zIndex: 1,
-          },
-          {
-            id: 'el-welcome-note',
-            type: 'text',
-            x: 180,
-            y: 160,
-            width: 400,
-            text: 'Click items from the left sidebar to add photos, stickers, and notes! Drag them anywhere on the page.',
-            fontFamily: 'Caveat',
-            fontSize: 22,
-            color: '#555',
-            textAlign: 'center',
-            rotation: 0,
-            zIndex: 2,
-          },
-        ],
-      },
-    ]
-
     try {
       const created = await createJournal({
         title: 'New Travel Journal',
         destination: 'My Destination',
         description: 'Start documenting your new adventures, photos, and polaroids.',
         cover_image_url: null,
-        pages: initialPages,
       })
 
       setIsLoading(false)
