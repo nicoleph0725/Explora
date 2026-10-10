@@ -8,7 +8,7 @@ import pytest
 
 def test_signup_success(client):
     response = client.post(                                                                                                                       
-            "/auth/sign-up",                                                                                                                          
+            "/auth/signup",                                                                                                                          
             json={
                 "email": "tester@example.com",
                 "full_name": "Test User",
